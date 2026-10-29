@@ -75,6 +75,10 @@ pub fn preview_jpeg(source: &Path, out_dir: &Path) -> Result<PathBuf, String> {
         .file_name()
         .and_then(|n| n.to_str())
         .ok_or_else(|| "file has no name".to_string())?;
+    // A grid of results must not download every cloud-only file it shows.
+    if crate::indexer::walker::is_cloud_placeholder_path(source) {
+        return Err(format!("{} is only in the cloud", name));
+    }
     match kind_for(name) {
         Some(Kind::Image) => crate::indexer::extract::image::thumbnail(source, out_dir)
             .ok_or_else(|| format!("could not decode image {}", name)),

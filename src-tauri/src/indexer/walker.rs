@@ -76,10 +76,13 @@ pub fn file_identity(meta: &std::fs::Metadata) -> (u64, u64) {
 /// True when the file is a cloud-backed placeholder that would be hydrated
 /// (downloaded) if its contents were read.
 ///
-/// Only Windows exposes this state through metadata attributes. On Linux and
-/// macOS, cloud providers (iCloud Drive, OneDrive FUSE mounts, …) present
-/// regular files whose stat does not trigger a download, so there is nothing
-/// portable to detect; returning `false` keeps indexing unchanged there.
+/// - Windows (OneDrive, Dropbox, iCloud for Windows): the offline /
+///   recall-on-data-access attributes.
+/// - macOS (iCloud Drive with "Optimize Mac Storage", Desktop & Documents in
+///   iCloud, File Provider apps): APFS marks evicted files `SF_DATALESS`.
+///   `stat` never downloads them, but reading even one byte does, so before
+///   this check indexing quietly downloaded the user's whole cloud library.
+/// - Linux has no common equivalent; returns `false`.
 #[cfg(windows)]
 pub fn is_cloud_placeholder(meta: &std::fs::Metadata) -> bool {
     use std::os::windows::fs::MetadataExt;
@@ -92,22 +95,30 @@ pub fn is_cloud_placeholder(meta: &std::fs::Metadata) -> bool {
     attributes & (FILE_ATTRIBUTE_OFFLINE | FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS) != 0
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "macos")]
+pub fn is_cloud_placeholder(meta: &std::fs::Metadata) -> bool {
+    use std::os::macos::fs::MetadataExt;
+
+    // <sys/stat.h>: "file is dataless object" (contents live in the cloud).
+    const SF_DATALESS: u32 = 0x4000_0000;
+    meta.st_flags() & SF_DATALESS != 0
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
 pub fn is_cloud_placeholder(_meta: &std::fs::Metadata) -> bool {
     false
 }
 
-/// Convenience wrapper for callers that only have a path.
-///
-/// On non-Windows platforms this never touches the filesystem.
+/// Convenience wrapper for callers that only have a path. A `stat`, which
+/// never downloads anything; on Linux it does not touch the filesystem.
 pub fn is_cloud_placeholder_path(path: &std::path::Path) -> bool {
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "macos"))]
     {
         std::fs::metadata(path)
             .map(|meta| is_cloud_placeholder(&meta))
             .unwrap_or(false)
     }
-    #[cfg(not(windows))]
+    #[cfg(not(any(windows, target_os = "macos")))]
     {
         let _ = path;
         false
