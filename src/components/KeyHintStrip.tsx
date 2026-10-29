@@ -18,6 +18,10 @@ function statusText(s: IndexingStatus | null | undefined): { text: string; busy:
   if (s.paused) return { text: "Indexing paused", busy: false };
   if (s.is_indexing || (s.phase && s.phase !== "idle")) {
     if (s.phase === "rebuilding") return { text: s.current_status || "Rebuilding index…", busy: true };
+    /* Background semantic embedding runs after the crawl. Showing it as
+       "Indexing N of N" (the finished crawl's counts) looked stuck. */
+    if (s.phase === "embedding" && !s.is_indexing)
+      return { text: `${formatComma(s.files_indexed)} files · building semantic index`, busy: true };
     const done = s.extract_done ?? s.files_indexed;
     const total = s.extract_total ?? s.total_files;
     return {

@@ -149,7 +149,10 @@ pub fn system_data_dirs() -> Vec<PathBuf> {
         return Vec::new();
     };
     if cfg!(windows) {
-        vec![home.join("AppData")]
+        // CrossDevice: Phone Link exposes a connected phone here as a live
+        // cloud-files folder. Listing it asks the phone over Wi-Fi, and when
+        // the phone is away Windows pops "<phone> is offline" every time.
+        vec![home.join("AppData"), home.join("CrossDevice")]
     } else if cfg!(target_os = "macos") {
         vec![home.join("Library")]
     } else {
@@ -174,6 +177,35 @@ fn prunes_for_roots_with(roots: &[PathBuf], system: Vec<PathBuf>) -> Vec<PathBuf
         }
     }
     prunes
+}
+
+/// True when `meta` is a cloud-backed folder whose listing is not on disk,
+/// so reading it would make the provider fetch it (OneDrive "online-only"
+/// folders, Phone Link, macOS File Provider). The folder itself stays
+/// findable by name; the walk just does not descend into it.
+#[cfg(windows)]
+pub fn is_unpopulated_cloud_dir(meta: &std::fs::Metadata) -> bool {
+    use std::os::windows::fs::MetadataExt;
+
+    const FILE_ATTRIBUTE_OFFLINE: u32 = 0x0000_1000;
+    const FILE_ATTRIBUTE_RECALL_ON_OPEN: u32 = 0x0004_0000;
+    const FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS: u32 = 0x0040_0000;
+    meta.is_dir()
+        && meta.file_attributes()
+            & (FILE_ATTRIBUTE_OFFLINE
+                | FILE_ATTRIBUTE_RECALL_ON_OPEN
+                | FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS)
+            != 0
+}
+
+#[cfg(target_os = "macos")]
+pub fn is_unpopulated_cloud_dir(meta: &std::fs::Metadata) -> bool {
+    meta.is_dir() && is_cloud_placeholder(meta)
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
+pub fn is_unpopulated_cloud_dir(_meta: &std::fs::Metadata) -> bool {
+    false
 }
 
 /// True when `path` lives at or below any of `prune_roots`.
@@ -255,6 +287,17 @@ pub fn walk_directories(
                         }
                         true
                     });
+                    // Keep cloud-only folders as entries, but never list
+                    // their contents: that is a network fetch (and, for a
+                    // phone over Phone Link, an "offline" popup).
+                    for entry in children.iter_mut().flatten() {
+                        if entry.file_type.is_dir()
+                            && let Ok(meta) = std::fs::metadata(entry.path())
+                            && is_unpopulated_cloud_dir(&meta)
+                        {
+                            entry.read_children = None;
+                        }
+                    }
                 }
             });
 

@@ -162,6 +162,15 @@ impl EmbeddingQueue {
                             continue;
                         }
 
+                        // The crawl never reads cloud-only files, so they reach
+                        // this queue unembedded. Reading one here downloads it
+                        // (or, for a phone over Phone Link, pops "offline"),
+                        // so mark it done without touching its contents.
+                        if crate::indexer::walker::is_cloud_placeholder_path(&path) {
+                            let _ = db.update_node_indexed_gen(node_id, 1, None);
+                            continue;
+                        }
+
                         let content = match read_text_content(&path, 1_048_576) {
                             Some(c) => c,
                             None => {
