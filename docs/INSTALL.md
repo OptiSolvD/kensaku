@@ -12,6 +12,7 @@ Download from [Releases](https://github.com/yjid/kensaku/releases).
 | macOS | `Kensaku_<ver>_universal.dmg` | Intel + Apple Silicon |
 | Windows | `Kensaku_<ver>_x64_en-US.msi` | per-user install |
 | Windows | `kensaku-portable-<ver>-x64.zip` | portable: unzip in a writable folder, run `kensaku.exe`; config/index/data live in `data\` next to the exe, nothing in `%APPDATA%`. Keeps the `portable` marker file in place. |
+| Windows on ARM | `Kensaku_<ver>_arm64_en-US.msi`, `kensaku_<ver>_arm64-setup.exe`, `kensaku-portable-<ver>-arm64.zip`, `kensaku-cli-windows-aarch64.exe` | native ARM64 (Snapdragon) builds; same layout as x64 |
 
 ### The builds are unsigned
 
