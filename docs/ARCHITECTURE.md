@@ -370,6 +370,7 @@ magic-byte sniff ─► dispatcher ─► built-in or opt-in external extractor
 | Format | Path | Notes |
 |---|---|---|
 | text/code/config | encoding detect → UTF-8 | UTF-16 BOM, Latin-1 fallback; strict-UTF-8 rejection is a bug |
+| CSV / TSV | delimiter sniff → RFC 4180 rows | one line per row as `column = "value"` pairs with the header repeated; header-only files index column names; line breaks inside cells become spaces |
 | DOCX/PPTX/XLSX/EPUB | ZIP + quick-xml | shared strings, speaker notes, hidden sheets; **DTDs disabled** (billion-laughs) |
 | PDF | `pdf-extract` first; `pdfium` feature flag if quality fails | page-level offsets → "jump to page"; encrypted/scanned → explicit state |
 | Images | PP-OCRv6 tiny by default; optional Indra pack (higher quality) → text units | OCR before CLIP; screenshots prioritized |

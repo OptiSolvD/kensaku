@@ -2,6 +2,33 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
+/// Decodes UTF-16 (LE or BE) when the buffer starts with its byte-order mark.
+/// Returns None if there is no UTF-16 BOM or the body is not valid UTF-16, so
+/// the caller can fall back to the other encodings.
+pub(crate) fn decode_utf16_bom(buffer: &[u8]) -> Option<String> {
+    if buffer.len() < 2 {
+        return None;
+    }
+    let units: Vec<u16> = if buffer[0] == 0xFF && buffer[1] == 0xFE {
+        buffer[2..]
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            .collect()
+    } else if buffer[0] == 0xFE && buffer[1] == 0xFF {
+        buffer[2..]
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|c| u16::from_be_bytes([c[0], c[1]]))
+            .collect()
+    } else {
+        return None;
+    };
+    String::from_utf16(&units).ok()
+}
+
 pub fn extract_text(path: &Path, max_bytes: usize) -> Option<String> {
     let mut file = File::open(path).ok()?;
     let mut buffer = Vec::new();
@@ -12,31 +39,9 @@ pub fn extract_text(path: &Path, max_bytes: usize) -> Option<String> {
         return None;
     }
 
-    // 1. Check for UTF-16 BOMs
-    if buffer.len() >= 2 {
-        if buffer[0] == 0xFF && buffer[1] == 0xFE {
-            // UTF-16 LE
-            let u16_slice: Vec<u16> = buffer[2..]
-                .as_chunks::<2>()
-                .0
-                .iter()
-                .map(|c| u16::from_le_bytes([c[0], c[1]]))
-                .collect();
-            if let Ok(s) = String::from_utf16(&u16_slice) {
-                return Some(clean_text(&s));
-            }
-        } else if buffer[0] == 0xFE && buffer[1] == 0xFF {
-            // UTF-16 BE
-            let u16_slice: Vec<u16> = buffer[2..]
-                .as_chunks::<2>()
-                .0
-                .iter()
-                .map(|c| u16::from_be_bytes([c[0], c[1]]))
-                .collect();
-            if let Ok(s) = String::from_utf16(&u16_slice) {
-                return Some(clean_text(&s));
-            }
-        }
+    // 1. UTF-16 with a byte-order mark (BOM)
+    if let Some(s) = decode_utf16_bom(&buffer) {
+        return Some(clean_text(&s));
     }
 
     // 2. Reject binary files (null bytes in first 1024 bytes)
@@ -213,6 +218,13 @@ mod tests {
         // Either decodes what it can of the full units or gives up; must not
         // panic and must not index the raw BOM bytes as text.
         let _ = extract_text(&fx.0, 1000);
+    }
+
+    #[test]
+    fn decode_utf16_bom_ignores_text_without_bom() {
+        assert_eq!(decode_utf16_bom(b"plain ascii"), None);
+        assert_eq!(decode_utf16_bom(b"x"), None);
+        assert_eq!(decode_utf16_bom(&[0xFF, 0xFE]).as_deref(), Some(""));
     }
 
     #[test]
