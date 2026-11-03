@@ -1263,10 +1263,6 @@ pub fn is_plain_text_extension(ext_opt: Option<&str>) -> bool {
     PLAIN_TEXT_EXTENSIONS.contains(&ext.as_str())
 }
 
-/// Builds a snippet without extracting anything.
-///
-/// Plain text is read directly; everything else only reads the extraction
-/// cache. See [`ContentIndex::get_snippet_fast`].
 /// Longest row snippet returned. Longer rows are cut and end with "...".
 const ROW_SNIPPET_BYTES: usize = 200;
 
@@ -1294,6 +1290,10 @@ fn delimited_row_snippet<'a>(mut rows: impl Iterator<Item = &'a str>, query: &st
     Some(format!("{clipped}..."))
 }
 
+/// Builds a snippet without extracting anything.
+///
+/// Plain text is read directly; everything else only reads the extraction
+/// cache. See [`ContentIndex::get_snippet_fast`].
 pub fn snippet_for_path(path: &Path, query: &str) -> Option<String> {
     if is_delimited_extension(path.extension().and_then(|ext| ext.to_str())) {
         let file = fs::File::open(path).ok()?;

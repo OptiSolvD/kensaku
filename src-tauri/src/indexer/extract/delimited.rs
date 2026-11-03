@@ -126,9 +126,12 @@ fn decode_text(buffer: &[u8]) -> Option<Cow<'_, str>> {
     }
     Some(match String::from_utf8_lossy(buffer) {
         Cow::Borrowed(valid) => Cow::Borrowed(valid.strip_prefix('\u{feff}').unwrap_or(valid)),
-        Cow::Owned(lossy) => {
-            Cow::Owned(lossy.strip_prefix('\u{feff}').unwrap_or(lossy.as_str()).to_string())
-        }
+        Cow::Owned(lossy) => Cow::Owned(
+            lossy
+                .strip_prefix('\u{feff}')
+                .unwrap_or(lossy.as_str())
+                .to_string(),
+        ),
     })
 }
 
@@ -462,10 +465,7 @@ mod tests {
 
     #[test]
     fn windows_line_endings_are_handled() {
-        assert_eq!(
-            rows("a,b\r\n1,2\r\n"),
-            vec!["a = \"1\", b = \"2\""]
-        );
+        assert_eq!(rows("a,b\r\n1,2\r\n"), vec!["a = \"1\", b = \"2\""]);
     }
 
     #[test]
