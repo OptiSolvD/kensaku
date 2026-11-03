@@ -131,7 +131,8 @@ Download the bundle for your system from the [latest release](https://github.com
 
 | Platform | Download |
 |---|---|
-| Windows | `Kensaku_<version>_x64-setup.exe` or `.msi` |
+| Windows (Intel/AMD) | `Kensaku_<version>_x64-setup.exe` or `.msi` |
+| Windows (ARM, Snapdragon) | `Kensaku_<version>_arm64-setup.exe` or `.msi` |
 | macOS (Apple silicon and Intel) | `Kensaku_<version>_universal.dmg` |
 | Linux | `.AppImage`, `.deb`, or `.rpm` |
 

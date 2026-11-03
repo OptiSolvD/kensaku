@@ -59,6 +59,7 @@ Check that the expected assets are present:
 | `kensaku_*_amd64.deb`, `kensaku-*.rpm`, `kensaku_*.AppImage` | Linux |
 | `kensaku_*_universal.dmg` | macOS |
 | `kensaku_*_x64-setup.exe`, `kensaku_*_x64_en-US.msi` | Windows |
+| `kensaku_*_arm64-setup.exe`, `kensaku_*_arm64_en-US.msi`, `kensaku-portable-*-{x64,arm64}.zip` | Windows (x64 and ARM64) |
 | `kensaku-cli-linux-*`, `kensaku-cli-macos-*`, `kensaku-cli-windows-*` | Agent CLI |
 | `SHA256SUMS` | All assets |
 

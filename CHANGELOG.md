@@ -22,6 +22,13 @@ versioning: [SemVer](https://semver.org/).
 - Multilingual and format documentation (`docs/LANGUAGES.md`): detailed
   analysis of CJK unigram + bigram segmentation, 50+ programming and data
   formats, and multi-script OCR engine routing.
+- Native Windows on ARM builds (#74): the release pipeline also produces
+  arm64 assets — `Kensaku_<ver>_arm64_en-US.msi`,
+  `kensaku_<ver>_arm64-setup.exe`, `kensaku-portable-<ver>-arm64.zip` and
+  `kensaku-cli-windows-aarch64.exe` — staged against Microsoft's
+  official `onnxruntime-win-arm64-1.31.0.zip` (SHA-256-pinned), so
+  Snapdragon laptops run PP-OCR natively instead of x64 under emulation.
+  Added to the v1.0.12 release after review.
 
 ### Fixed
 - macOS permissions (#73): bundled `Info.plist` with explicit TCC privacy
