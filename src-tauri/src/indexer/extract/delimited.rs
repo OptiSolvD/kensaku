@@ -4,7 +4,11 @@
 //! `column = "value"` pairs. A search for a column name or a cell value then
 //! lands on the row that holds it. Lines are separated by newlines, so a
 //! newline inside a cell is flattened to a space.
+//!
+//! The parser borrows field text from the input wherever it can, and writes
+//! each row straight into the output, so a plain cell costs no allocation.
 
+use std::borrow::Cow;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
@@ -25,84 +29,83 @@ pub fn extract_delimited(path: &Path, max_bytes: usize) -> Option<String> {
         .take(max_bytes as u64)
         .read_to_end(&mut buffer)
         .ok()?;
-    let rows = row_blocks(&buffer, truncated, hint_for_path(path));
-    join_within_cap(&rows, max_bytes)
+    render_rows(&buffer, truncated, hint_for_path(path), max_bytes)
 }
 
-/// Decodes `buffer` and returns one block of text per data row.
+/// Row text as separate lines, for the snippet path. Rows are never split.
+pub(crate) fn row_blocks(buffer: &[u8], truncated: bool, hint: u8) -> Vec<String> {
+    render_rows(buffer, truncated, hint, usize::MAX)
+        .map(|text| text.lines().map(str::to_string).collect::<Vec<String>>())
+        .unwrap_or_default()
+}
+
+/// Decodes `buffer` and renders one line per data row, up to `cap` bytes.
 ///
-/// `truncated` means the buffer is only the start of a larger file, so its
-/// last record may be cut off and is dropped. `hint` is the delimiter to
-/// prefer when candidates look equally consistent (tab for `.tsv`).
-pub(crate) fn row_blocks(buffer: &[u8], truncated: bool, hint: char) -> Vec<String> {
-    let Some(text) = decode_text(buffer) else {
-        return Vec::new();
-    };
+/// `truncated` means the buffer is only the start of a larger file: a last
+/// record that ends without a line break may be cut off, so it is dropped.
+/// `hint` is the delimiter to prefer when candidates look equally consistent.
+fn render_rows(buffer: &[u8], truncated: bool, hint: u8, cap: usize) -> Option<String> {
+    let text = decode_text(buffer)?;
     if text.trim().is_empty() {
-        return Vec::new();
+        return None;
     }
-
     let delimiter = sniff_delimiter(&text, hint);
-    let mut records = parse_records(&text, delimiter);
-    if truncated {
-        records.pop();
-    }
-    let mut records = records.into_iter();
-    let Some(header) = records.next() else {
-        return Vec::new();
-    };
 
-    let names: Vec<String> = header
-        .iter()
-        .enumerate()
-        .map(|(index, raw)| column_name(raw, index))
-        .collect();
-
-    let blocks: Vec<String> = records
-        .map(|record| {
-            record
-                .iter()
-                .enumerate()
-                .map(|(index, value)| {
-                    let name = names
-                        .get(index)
-                        .cloned()
-                        .unwrap_or_else(|| fallback_name(index));
-                    let value = one_line(value);
-                    format!("{name} = \"{value}\"")
-                })
-                .collect::<Vec<_>>()
-                .join(", ")
-        })
-        .collect();
-
-    if blocks.is_empty() {
-        // Header only: index the column names so they stay searchable.
-        return vec![names.join(", ")];
-    }
-    blocks
-}
-
-/// Joins row blocks with newlines, keeping whole rows only. If the first row
-/// alone is longer than `cap`, it is cut at a character boundary instead.
-fn join_within_cap(blocks: &[String], cap: usize) -> Option<String> {
+    let mut names: Option<Vec<String>> = None;
     let mut out = String::new();
-    for block in blocks {
-        let needed = if out.is_empty() {
-            block.len()
-        } else {
-            out.len() + 1 + block.len()
-        };
-        if needed <= cap {
-            if !out.is_empty() {
-                out.push('\n');
+
+    for_each_record(&text, delimiter, |fields, terminated| {
+        if truncated && !terminated {
+            return false;
+        }
+        if names.is_none() {
+            names = Some(
+                fields
+                    .iter()
+                    .enumerate()
+                    .map(|(index, raw)| column_name(raw, index))
+                    .collect(),
+            );
+            return true;
+        }
+        let names_ref = names.as_deref().unwrap_or(&[]);
+
+        let mark = out.len();
+        if !out.is_empty() {
+            out.push('\n');
+        }
+        for (index, value) in fields.iter().enumerate() {
+            if index > 0 {
+                out.push_str(", ");
             }
-            out.push_str(block);
-        } else {
-            if out.is_empty() {
-                out.push_str(clip_to_char_boundary(block, cap));
+            match names_ref.get(index) {
+                Some(name) => out.push_str(name),
+                None => out.push_str(&fallback_name(index)),
             }
-            break;
+            out.push_str(" = \"");
+            push_one_line(&mut out, value);
+            out.push('"');
+        }
+
+        if out.len() <= cap {
+            return true;
+        }
+        if mark == 0 {
+            // The first row alone is longer than the cap: keep the part that fits.
+            let keep = clip_to_char_boundary(&out, cap).len();
+            out.truncate(keep);
+        } else {
+            out.truncate(mark);
+        }
+        false
+    });
+
+    if out.is_empty() {
+        // No data rows: index the column names so they stay searchable.
+        out = names?.join(", ");
+        if out.len() > cap {
+            let keep = clip_to_char_boundary(&out, cap).len();
+            out.truncate(keep);
         }
     }
     if out.trim().is_empty() {
@@ -112,96 +115,170 @@ fn join_within_cap(blocks: &[String], cap: usize) -> Option<String> {
     }
 }
 
-/// Decodes UTF-16 (BOM), or UTF-8 with an optional UTF-8 BOM. Returns None for
-/// binary data, using the same NUL-byte check as plain text.
-fn decode_text(buffer: &[u8]) -> Option<String> {
+/// Decodes UTF-16 (with its BOM), or UTF-8 with an optional UTF-8 BOM.
+/// Returns None for binary data, using the same NUL-byte check as plain text.
+fn decode_text(buffer: &[u8]) -> Option<Cow<'_, str>> {
     if let Some(text) = decode_utf16_bom(buffer) {
-        return Some(text);
+        return Some(Cow::Owned(text));
     }
     if buffer.iter().take(1024).any(|&byte| byte == 0) {
         return None;
     }
-    let text = match std::str::from_utf8(buffer) {
-        Ok(valid) => valid.to_string(),
-        Err(_) => String::from_utf8_lossy(buffer).into_owned(),
-    };
-    Some(text.strip_prefix('\u{feff}').unwrap_or(text.as_str()).to_string())
+    Some(match String::from_utf8_lossy(buffer) {
+        Cow::Borrowed(valid) => Cow::Borrowed(valid.strip_prefix('\u{feff}').unwrap_or(valid)),
+        Cow::Owned(lossy) => {
+            Cow::Owned(lossy.strip_prefix('\u{feff}').unwrap_or(lossy.as_str()).to_string())
+        }
+    })
 }
 
 /// Picks the delimiter whose first records agree on the most fields.
 /// Ties go to the earlier candidate, so the hint is tried first.
-fn sniff_delimiter(text: &str, hint: char) -> char {
+fn sniff_delimiter(text: &str, hint: u8) -> u8 {
     let sample = clip_to_char_boundary(text, SNIFF_BYTES);
-    let candidates = [hint, ',', ';', '\t'];
-    // (delimiter, records that agree on the width, field count)
-    let mut best = (hint, 0, 0);
-    for delimiter in candidates {
-        let records: Vec<Vec<String>> = parse_records(sample, delimiter)
-            .into_iter()
-            .take(SNIFF_RECORDS)
-            .collect();
-        let Some(width) = records.first().map(Vec::len) else {
-            continue;
-        };
-        if width < 2 {
-            continue;
-        }
-        let agreeing = records.iter().filter(|record| record.len() == width).count();
-        if (agreeing, width) > (best.1, best.2) {
-            best = (delimiter, agreeing, width);
+    // (delimiter, records that agree on the field count, field count)
+    let mut best = (hint, 0usize, 0usize);
+    for candidate in [hint, b',', b';', b'\t'] {
+        let mut width = 0usize;
+        let mut agreeing = 0usize;
+        let mut seen = 0usize;
+        for_each_record(sample, candidate, |fields, _| {
+            if seen == 0 {
+                width = fields.len();
+            }
+            if fields.len() == width {
+                agreeing += 1;
+            }
+            seen += 1;
+            seen < SNIFF_RECORDS
+        });
+        if width >= 2 && (agreeing, width) > (best.1, best.2) {
+            best = (candidate, agreeing, width);
         }
     }
     best.0
 }
 
-/// Splits text into records of fields, following RFC 4180 quoting: a quoted
-/// field may contain the delimiter, line breaks and doubled quotes. Blank
-/// lines are skipped. An unclosed quote runs to the end of the text.
-fn parse_records(text: &str, delimiter: char) -> Vec<Vec<String>> {
-    let mut records = Vec::new();
-    let mut record: Vec<String> = Vec::new();
-    let mut field = String::new();
-    let mut in_quotes = false;
-    let mut chars = text.chars().peekable();
+/// Calls `visit` with the fields of each record, in order. The bool passed
+/// with the fields is false when the record ends at the end of the text
+/// without a line break. Blank lines are skipped. Returning false stops.
+fn for_each_record<'a>(
+    text: &'a str,
+    delimiter: u8,
+    mut visit: impl FnMut(&[Cow<'a, str>], bool) -> bool,
+) {
+    let bytes = text.as_bytes();
+    let len = bytes.len();
+    let mut pos = 0;
+    let mut fields: Vec<Cow<'a, str>> = Vec::new();
 
-    while let Some(c) = chars.next() {
-        if in_quotes {
-            if c != '"' {
-                field.push(c);
-            } else if chars.peek() == Some(&'"') {
-                // A doubled quote inside quotes is one literal quote.
-                field.push('"');
-                chars.next();
-            } else {
-                in_quotes = false;
+    while pos < len {
+        fields.clear();
+        let terminated = loop {
+            let (field, next) = read_field(text, pos, delimiter);
+            fields.push(field);
+            pos = next;
+            if pos >= len {
+                break false;
             }
-        } else if c == '"' && field.is_empty() {
-            in_quotes = true;
-        } else if c == delimiter {
-            record.push(std::mem::take(&mut field));
-        } else if c == '\n' || c == '\r' {
-            if c == '\r' && chars.peek() == Some(&'\n') {
-                chars.next();
+            // Here `pos` is a delimiter, a line break, or the end of the text.
+            match bytes[pos] {
+                b'\n' => {
+                    pos += 1;
+                    break true;
+                }
+                b'\r' => {
+                    pos += 1;
+                    if pos < len && bytes[pos] == b'\n' {
+                        pos += 1;
+                    }
+                    break true;
+                }
+                _ => pos += 1,
             }
-            end_record(&mut record, &mut field, &mut records);
-        } else {
-            field.push(c);
+        };
+        // A blank line is one empty field: skip it.
+        if fields.len() == 1 && fields[0].is_empty() {
+            continue;
+        }
+        if !visit(&fields, terminated) {
+            return;
         }
     }
-    if !field.is_empty() || !record.is_empty() {
-        end_record(&mut record, &mut field, &mut records);
-    }
-    records
 }
 
-fn end_record(record: &mut Vec<String>, field: &mut String, records: &mut Vec<Vec<String>>) {
-    record.push(std::mem::take(field));
-    // A blank line is a single empty field: skip it.
-    if record.len() == 1 && record[0].is_empty() {
-        record.clear();
-        return;
+/// Reads one field starting at `start`. Returns its value and the position of
+/// the delimiter, line break or end of text that follows it.
+fn read_field(text: &str, start: usize, delimiter: u8) -> (Cow<'_, str>, usize) {
+    let bytes = text.as_bytes();
+    if bytes.get(start) == Some(&b'"') {
+        return read_quoted(text, start + 1, delimiter);
     }
-    records.push(std::mem::take(record));
+    let mut end = start;
+    while end < bytes.len() && !is_field_end(bytes[end], delimiter) {
+        end += 1;
+    }
+    (Cow::Borrowed(&text[start..end]), end)
+}
+
+/// Reads a quoted field whose content starts at `content_start`, just after
+/// the opening quote. `""` inside quotes is one literal quote. Text after the
+/// closing quote, up to the next delimiter or line break, is kept.
+fn read_quoted(text: &str, content_start: usize, delimiter: u8) -> (Cow<'_, str>, usize) {
+    let bytes = text.as_bytes();
+    let len = bytes.len();
+    let mut owned: Option<String> = None;
+    let mut segment = content_start;
+    let mut pos = content_start;
+
+    let close = loop {
+        let Some(offset) = bytes[pos..].iter().position(|&b| b == b'"') else {
+            // Unclosed quote: the field runs to the end of the text.
+            break len;
+        };
+        let quote = pos + offset;
+        if bytes.get(quote + 1) == Some(&b'"') {
+            owned
+                .get_or_insert_with(String::new)
+                .push_str(&text[segment..=quote]);
+            segment = quote + 2;
+            pos = segment;
+        } else {
+            break quote;
+        }
+    };
+
+    let mut value = match owned {
+        Some(mut buf) => {
+            buf.push_str(&text[segment..close]);
+            Cow::Owned(buf)
+        }
+        None => Cow::Borrowed(&text[content_start..close]),
+    };
+
+    let mut next = if close < len { close + 1 } else { len };
+    let trailing_start = next;
+    while next < len && !is_field_end(bytes[next], delimiter) {
+        next += 1;
+    }
+    if next > trailing_start {
+        value = Cow::Owned(format!("{value}{}", &text[trailing_start..next]));
+    }
+    (value, next)
+}
+
+fn is_field_end(byte: u8, delimiter: u8) -> bool {
+    byte == delimiter || byte == b'\n' || byte == b'\r'
+}
+
+/// Appends a cell value on one line: trimmed, with line breaks turned into spaces.
+fn push_one_line(out: &mut String, value: &str) {
+    let value = value.trim();
+    if value.contains(['\n', '\r']) {
+        out.push_str(&value.replace(['\n', '\r'], " "));
+    } else {
+        out.push_str(value);
+    }
 }
 
 fn column_name(raw: &str, index: usize) -> String {
@@ -217,17 +294,11 @@ fn fallback_name(index: usize) -> String {
     format!("column{}", index + 1)
 }
 
-/// Cell values are trimmed and any line breaks become spaces, so that a
-/// newline always means "next row".
-fn one_line(value: &str) -> String {
-    value.trim().replace(['\n', '\r'], " ")
-}
-
 /// Delimiter to prefer on ties: tab for `.tsv`, comma otherwise.
-pub(crate) fn hint_for_path(path: &Path) -> char {
+pub(crate) fn hint_for_path(path: &Path) -> u8 {
     match path.extension().and_then(|ext| ext.to_str()) {
-        Some(ext) if ext.eq_ignore_ascii_case("tsv") => '\t',
-        _ => ',',
+        Some(ext) if ext.eq_ignore_ascii_case("tsv") => b'\t',
+        _ => b',',
     }
 }
 
@@ -270,7 +341,9 @@ mod tests {
     }
 
     fn rows(text: &str) -> Vec<String> {
-        row_blocks(text.as_bytes(), false, ',')
+        render_rows(text.as_bytes(), false, b',', usize::MAX)
+            .map(|out| out.lines().map(str::to_string).collect::<Vec<String>>())
+            .unwrap_or_default()
     }
 
     #[test]
@@ -293,16 +366,16 @@ mod tests {
     #[test]
     fn tsv_file_uses_tab() {
         assert_eq!(
-            row_blocks(b"a\tb\n1\t2\n", false, '\t'),
-            vec!["a = \"1\", b = \"2\""]
+            render_rows(b"a\tb\n1\t2\n", false, b'\t', usize::MAX).as_deref(),
+            Some("a = \"1\", b = \"2\"")
         );
     }
 
     #[test]
     fn tab_hint_wins_a_tie_against_commas_in_values() {
         assert_eq!(
-            row_blocks("a\tb,c\n1\t2,3\n".as_bytes(), false, '\t'),
-            vec!["a = \"1\", b,c = \"2,3\""]
+            render_rows("a\tb,c\n1\t2,3\n".as_bytes(), false, b'\t', usize::MAX).as_deref(),
+            Some("a = \"1\", b,c = \"2,3\"")
         );
     }
 
@@ -311,8 +384,8 @@ mod tests {
         let mut bytes = vec![0xEF, 0xBB, 0xBF];
         bytes.extend_from_slice(b"name,city\nAda,London\n");
         assert_eq!(
-            row_blocks(&bytes, false, ','),
-            vec!["name = \"Ada\", city = \"London\""]
+            render_rows(&bytes, false, b',', usize::MAX).as_deref(),
+            Some("name = \"Ada\", city = \"London\"")
         );
     }
 
@@ -342,7 +415,7 @@ mod tests {
     #[test]
     fn row_wider_than_the_cap_is_cut_not_dropped() {
         let text = format!("name\n{}\n", "x".repeat(300));
-        let out = join_within_cap(&rows(&text), 40).unwrap();
+        let out = render_rows(text.as_bytes(), false, b',', 40).unwrap();
         assert!(out.len() <= 40);
         assert!(out.starts_with("name = \"xxx"));
     }
@@ -374,7 +447,23 @@ mod tests {
     #[test]
     fn truncated_input_drops_the_partial_last_row() {
         assert_eq!(
-            row_blocks(b"a,b\n1,2\n3,4", true, ','),
+            render_rows(b"a,b\n1,2\n3,4", true, b',', usize::MAX).as_deref(),
+            Some("a = \"1\", b = \"2\"")
+        );
+    }
+
+    #[test]
+    fn truncated_input_keeps_rows_that_end_at_a_line_break() {
+        assert_eq!(
+            render_rows(b"a,b\n1,2\n", true, b',', usize::MAX).as_deref(),
+            Some("a = \"1\", b = \"2\"")
+        );
+    }
+
+    #[test]
+    fn windows_line_endings_are_handled() {
+        assert_eq!(
+            rows("a,b\r\n1,2\r\n"),
             vec!["a = \"1\", b = \"2\""]
         );
     }
