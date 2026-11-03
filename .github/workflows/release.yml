@@ -34,6 +34,16 @@ jobs:
           - platform: windows-latest
             artifact: kensaku-windows
             args: "--config src-tauri/tauri.onnxruntime.windows.conf.json"
+            arch: x64
+            ort_sha256: 3958d8a44984160692c1b4ffd0de3cb48f8c39f9d34bb31e433db06e30b82195
+          # Native Windows on ARM (Snapdragon) build: x64 builds only run
+          # there under emulation, and the bundled onnxruntime.dll must match
+          # the process architecture or PP-OCR cannot load.
+          - platform: windows-11-arm
+            artifact: kensaku-windows-arm64
+            args: "--config src-tauri/tauri.onnxruntime.windows.conf.json"
+            arch: arm64
+            ort_sha256: ef6206fa8d6975878d93a97035d280240ce5764c126a7430e5427e18923316d5
 
     steps:
       - uses: actions/checkout@v7
@@ -88,19 +98,20 @@ jobs:
       # it). 1.31 has no Intel macOS build; on Intel Macs PP-OCR says so and
       # Tesseract is used.
       - name: Stage ONNX Runtime (Windows)
-        if: matrix.platform == 'windows-latest'
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $version = "1.31.0"
-          $sha256 = "3958d8a44984160692c1b4ffd0de3cb48f8c39f9d34bb31e433db06e30b82195"
-          $url = "https://github.com/microsoft/onnxruntime/releases/download/v$version/onnxruntime-win-x64-$version.zip"
+          $arch = "${{ matrix.arch }}"
+          $sha256 = "${{ matrix.ort_sha256 }}"
+          $url = "https://github.com/microsoft/onnxruntime/releases/download/v$version/onnxruntime-win-$arch-$version.zip"
           $zip = Join-Path $env:RUNNER_TEMP "onnxruntime.zip"
           $out = Join-Path $env:RUNNER_TEMP "onnxruntime"
           Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
           $actual = (Get-FileHash -Algorithm SHA256 $zip).Hash.ToLower()
           if ($actual -ne $sha256) { throw "onnxruntime zip checksum mismatch: $actual" }
           Expand-Archive -Path $zip -DestinationPath $out -Force
-          Copy-Item -Path (Join-Path $out "onnxruntime-win-x64-$version\lib\onnxruntime.dll") -Destination "src-tauri\onnxruntime.dll"
+          Copy-Item -Path (Join-Path $out "onnxruntime-win-$arch-$version\lib\onnxruntime.dll") -Destination "src-tauri\onnxruntime.dll"
           if (-not (Test-Path "src-tauri\onnxruntime.dll")) { throw "onnxruntime.dll was not staged" }
 
       - name: Stage ONNX Runtime (macOS, Apple silicon)
@@ -143,7 +154,7 @@ jobs:
       # content index, thumbs, OCR state) in <exe_dir>/data — no registry,
       # no %APPDATA%. The zip is the artifact #68 asks for.
       - name: Zip Windows portable build
-        if: matrix.platform == 'windows-latest'
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $version = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
@@ -161,9 +172,9 @@ jobs:
           The folder must be writable. Requires the system WebView2
           runtime, preinstalled on Windows 10 1803+ and Windows 11.
           '@ | Set-Content -Path "dist\portable\README.txt"
-          Compress-Archive -Path "dist\portable\*" -DestinationPath "dist\kensaku-portable-$version-x64.zip" -Force
+          Compress-Archive -Path "dist\portable\*" -DestinationPath "dist\kensaku-portable-$version-${{ matrix.arch }}.zip" -Force
           Remove-Item -Recurse -Force "dist\portable"
-          $zip = Get-ChildItem "dist\kensaku-portable-$version-x64.zip"
+          $zip = Get-ChildItem "dist\kensaku-portable-$version-${{ matrix.arch }}.zip"
           Write-Output "staged $($zip.Name) ($([math]::Round($zip.Length / 1MB, 1)) MB)"
 
       - name: Upload bundles
@@ -192,6 +203,9 @@ jobs:
           - platform: windows-latest
             artifact: kensaku-cli-windows
             target: x86_64-pc-windows-msvc
+          - platform: windows-11-arm
+            artifact: kensaku-cli-windows-arm64
+            target: aarch64-pc-windows-msvc
 
     steps:
       - uses: actions/checkout@v7
