@@ -1,3 +1,4 @@
+pub mod delimited;
 pub mod external;
 pub mod image;
 pub mod office;
@@ -97,6 +98,8 @@ pub enum DocumentFormat {
     Ods,
     Odp,
     Rtf,
+    /// CSV and TSV: one line of text per row.
+    Delimited,
     PlainText,
     Image,
     Unknown,
@@ -167,9 +170,10 @@ pub fn sniff_format(path: &Path) -> DocumentFormat {
         "png" | "jpg" | "jpeg" | "gif" | "bmp" | "webp" | "tiff" | "tif" | "heic" | "heif" => {
             DocumentFormat::Image
         }
+        "csv" | "tsv" => DocumentFormat::Delimited,
         "txt" | "md" | "markdown" | "rs" | "ts" | "tsx" | "js" | "jsx" | "py" | "go" | "json"
         | "toml" | "yaml" | "yml" | "xml" | "html" | "htm" | "css" | "c" | "cpp" | "h" | "java"
-        | "sh" | "log" | "csv" | "sql" => DocumentFormat::PlainText,
+        | "sh" | "log" | "sql" => DocumentFormat::PlainText,
         _ => DocumentFormat::Unknown,
     }
 }
@@ -701,6 +705,17 @@ fn extract_document_inner(
                 is_encrypted: false,
                 is_scanned: true,
                 format_name: "Image (OCR)".to_string(),
+            })
+        }
+        DocumentFormat::Delimited => {
+            // Rows are kept whole, so this arm never uses the head/tail split below.
+            let text = delimited::extract_delimited(path, capped_bytes)?;
+            Some(DocumentExtract {
+                text,
+                page_count: None,
+                is_encrypted: false,
+                is_scanned: false,
+                format_name: "Delimited text".to_string(),
             })
         }
         DocumentFormat::PlainText | DocumentFormat::Unknown => {

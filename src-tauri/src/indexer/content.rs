@@ -1206,8 +1206,6 @@ pub fn is_plain_text_extension(ext_opt: Option<&str>) -> bool {
         "log",
         "diff",
         "patch",
-        "csv",
-        "tsv",
         // Code
         "rs",
         "ts",
@@ -1269,7 +1267,44 @@ pub fn is_plain_text_extension(ext_opt: Option<&str>) -> bool {
 ///
 /// Plain text is read directly; everything else only reads the extraction
 /// cache. See [`ContentIndex::get_snippet_fast`].
+/// Longest row snippet returned. Longer rows are cut and end with "...".
+const ROW_SNIPPET_BYTES: usize = 200;
+
+/// True for CSV and TSV files, which get row-aligned snippets.
+pub fn is_delimited_extension(ext_opt: Option<&str>) -> bool {
+    matches!(ext_opt.map(str::to_ascii_lowercase).as_deref(), Some("csv" | "tsv"))
+}
+
+/// Snippet for a delimited file: the first row that contains a query term.
+/// Each row is one line, so the snippet never splits a row.
+fn delimited_row_snippet<'a>(mut rows: impl Iterator<Item = &'a str>, query: &str) -> Option<String> {
+    let query_lower = query.to_lowercase();
+    let terms: Vec<&str> = query_lower.split_whitespace().collect();
+    if terms.is_empty() {
+        return None;
+    }
+    let row = rows.find(|row| {
+        let lower = row.to_lowercase();
+        terms.iter().any(|term| lower.contains(*term))
+    })?;
+    if row.len() <= ROW_SNIPPET_BYTES {
+        return Some(row.to_string());
+    }
+    let clipped = crate::indexer::extract::delimited::clip_to_char_boundary(row, ROW_SNIPPET_BYTES);
+    Some(format!("{clipped}..."))
+}
+
 pub fn snippet_for_path(path: &Path, query: &str) -> Option<String> {
+    if is_delimited_extension(path.extension().and_then(|ext| ext.to_str())) {
+        let file = fs::File::open(path).ok()?;
+        let truncated = file.metadata().ok()?.len() > SNIPPET_READ_LIMIT;
+        let mut buffer = Vec::with_capacity(SNIPPET_READ_LIMIT as usize);
+        file.take(SNIPPET_READ_LIMIT).read_to_end(&mut buffer).ok()?;
+        let hint = crate::indexer::extract::delimited::hint_for_path(path);
+        let rows = crate::indexer::extract::delimited::row_blocks(&buffer, truncated, hint);
+        return delimited_row_snippet(rows.iter().map(String::as_str), query);
+    }
+
     if is_plain_text_extension(path.extension().and_then(|ext| ext.to_str())) {
         let file = fs::File::open(path).ok()?;
         let mut buffer = Vec::with_capacity(SNIPPET_READ_LIMIT as usize);
@@ -1332,6 +1367,7 @@ pub fn is_indexable_extension(ext_opt: Option<&str>) -> bool {
         "conf",
         "log",
         "csv",
+        "tsv",
         "sql",
         "rb",
         "php",
@@ -1969,6 +2005,29 @@ mod tests {
             started.elapsed()
         );
         let _ = fs::remove_file(&pdf_path);
+    }
+
+    #[test]
+    fn csv_snippet_returns_the_matching_row() {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "kensaku-csv-snippet-{}-{nanos}.csv",
+            std::process::id()
+        ));
+        std::fs::write(
+            &path,
+            "name,city,note\nAda,London,first programmer\nGrace,New York,admiral\n",
+        )
+        .unwrap();
+        let snippet = snippet_for_path(&path, "london");
+        let _ = std::fs::remove_file(&path);
+        assert_eq!(
+            snippet.as_deref(),
+            Some("name = \"Ada\", city = \"London\", note = \"first programmer\"")
+        );
     }
 
     #[test]
