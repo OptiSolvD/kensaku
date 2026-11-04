@@ -47,6 +47,11 @@ impl Drop for WatcherHandle {
 
 /// How long a path must be quiet before the watcher reads it.
 const SETTLE: Duration = Duration::from_millis(400);
+/// Overflow events can arrive in storms: on Linux an inotify queue overflow
+/// over a large or network-backed tree reports `need_rescan`, and the signal
+/// repeats while the tree keeps changing. A rescan walks every root, so
+/// coalesce them instead of starting one per event.
+const RESCAN_COOLDOWN: Duration = Duration::from_secs(60);
 /// Extra observation for files whose mtime is still inside the retry window.
 const FRESH_RETRY: Duration = Duration::from_millis(500);
 /// A file written this recently is re-checked before its content is trusted.
@@ -218,6 +223,7 @@ fn run_watcher(
     let mut pending = PendingUpserts::default();
     let mut pending_commits = 0;
     let mut last_commit = SystemTime::now();
+    let mut last_rescan: Option<Instant> = None;
     let rescan_running = Arc::new(AtomicBool::new(false));
 
     loop {
@@ -259,15 +265,15 @@ fn run_watcher(
                         &mut pending,
                         Instant::now(),
                     );
-                    if event.need_rescan() {
-                        spawn_rescan(
-                            &watched_dirs,
-                            &cfg,
-                            &metadata,
-                            &content_index,
-                            &rescan_running,
-                        );
-                    }
+                    maybe_spawn_rescan(
+                        event.need_rescan(),
+                        &mut last_rescan,
+                        &watched_dirs,
+                        &cfg,
+                        &metadata,
+                        &content_index,
+                        &rescan_running,
+                    );
                     batch_count += 1;
                     if batch_count >= 100 {
                         break; // Process max 100 per batch to avoid blocking
@@ -308,15 +314,15 @@ fn run_watcher(
                         &mut pending,
                         Instant::now(),
                     );
-                    if event.need_rescan() {
-                        spawn_rescan(
-                            &watched_dirs,
-                            &cfg,
-                            &metadata,
-                            &content_index,
-                            &rescan_running,
-                        );
-                    }
+                    maybe_spawn_rescan(
+                        event.need_rescan(),
+                        &mut last_rescan,
+                        &watched_dirs,
+                        &cfg,
+                        &metadata,
+                        &content_index,
+                        &rescan_running,
+                    );
                 }
                 Ok(Err(e)) => {
                     eprintln!("[Kensaku Watcher] Error event: {:?}", e);
@@ -351,16 +357,44 @@ fn run_watcher(
     }
 }
 
-/// Reconciles the whole watched tree after a platform overflow/rescan signal.
-fn spawn_rescan(
+/// True when another overflow rescan is allowed at `now`.
+fn rescan_due(last: Option<Instant>, now: Instant) -> bool {
+    last.is_none_or(|last| now.saturating_duration_since(last) >= RESCAN_COOLDOWN)
+}
+
+/// Starts an overflow rescan when the cooldown allows it and nothing is
+/// already running. Returns whether a rescan was actually started.
+fn maybe_spawn_rescan(
+    need_rescan: bool,
+    last_rescan: &mut Option<Instant>,
     watched_dirs: &[PathBuf],
     cfg: &KensakuConfig,
     metadata: &Arc<RwLock<MetadataStore>>,
     content_index: &Arc<RwLock<Option<ContentIndex>>>,
     running: &Arc<AtomicBool>,
 ) {
-    if running.swap(true, Ordering::SeqCst) {
+    let now = Instant::now();
+    if !need_rescan || !rescan_due(*last_rescan, now) {
         return;
+    }
+    if spawn_rescan(watched_dirs, cfg, metadata, content_index, running) {
+        *last_rescan = Some(now);
+    }
+}
+
+/// Reconciles the whole watched tree after a platform overflow/rescan signal.
+///
+/// Returns `false` when a rescan is already in flight; the running pass is
+/// walking the same tree, so overlapping is never useful.
+fn spawn_rescan(
+    watched_dirs: &[PathBuf],
+    cfg: &KensakuConfig,
+    metadata: &Arc<RwLock<MetadataStore>>,
+    content_index: &Arc<RwLock<Option<ContentIndex>>>,
+    running: &Arc<AtomicBool>,
+) -> bool {
+    if running.swap(true, Ordering::SeqCst) {
+        return false;
     }
     let dirs = watched_dirs.to_vec();
     let cfg = cfg.clone();
@@ -374,6 +408,7 @@ fn spawn_rescan(
         }
         running.store(false, Ordering::SeqCst);
     });
+    true
 }
 
 fn rescan_watched_dirs(
@@ -388,6 +423,19 @@ fn rescan_watched_dirs(
     let mut changed = 0;
     for entry in &entries {
         if is_path_excluded(&entry.path, cfg) {
+            continue;
+        }
+        // A rescan exists to reconcile paths the watcher may have missed, not
+        // to re-read the tree. Skipping unchanged entries is what keeps an
+        // overflow storm from turning into a full-corpus re-index (large
+        // corpora on mounted drives overflow inotify regularly). Pending
+        // entries are still retried, and a changed file always differs in at
+        // least one of mtime/size.
+        let unchanged = metadata
+            .read()
+            .get(&entry.path)
+            .is_some_and(|existing| super::is_unchanged(&existing, entry));
+        if unchanged {
             continue;
         }
         handle_file_upsert(&entry.path, metadata, content_index);
@@ -1132,5 +1180,41 @@ mod tests {
             metadata.read().get(&ghost).is_none(),
             "overflow rescan must remove ghosts"
         );
+    }
+
+    #[test]
+    fn rescans_are_throttled() {
+        let now = Instant::now();
+        assert!(rescan_due(None, now), "the first overflow always rescans");
+        assert!(rescan_due(Some(now - RESCAN_COOLDOWN), now));
+        assert!(
+            !rescan_due(Some(now - Duration::from_secs(1)), now),
+            "a second overflow inside the cooldown must be ignored"
+        );
+    }
+
+    #[test]
+    fn unchanged_rescan_does_not_reindex_the_tree() {
+        let root = temp_dir("rescan-unchanged");
+        // Keep the SQLite database outside the watched root: writes to it
+        // would otherwise change the root's own mtime and make this flaky.
+        let data = temp_dir("rescan-unchanged-store");
+        std::fs::write(root.join("stable.txt"), "stable").unwrap();
+        let cfg = KensakuConfig {
+            watched_dirs: vec![root.clone()],
+            ..KensakuConfig::default()
+        };
+        let metadata = store(&data);
+        let content_index = no_content();
+
+        let first =
+            rescan_watched_dirs(std::slice::from_ref(&root), &cfg, &metadata, &content_index);
+        assert!(first > 0, "the first rescan must pick up the new tree");
+        let entries = metadata.read().len();
+
+        let second =
+            rescan_watched_dirs(std::slice::from_ref(&root), &cfg, &metadata, &content_index);
+        assert_eq!(second, 0, "an unchanged tree must not be re-indexed");
+        assert_eq!(metadata.read().len(), entries);
     }
 }
