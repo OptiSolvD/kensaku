@@ -44,3 +44,4 @@ optional where noted; missing keys fall back to the listed default.
 | `results_view` | string | `grid` | `grid` or `list`. |
 | `show_thumbnails` | bool | `true` | Show thumbnails. |
 | `start_at_login` | bool | `false` | Autostart on sign-in. |
+| `auto_update` | bool | `true` | Automatically check for updates in background. |

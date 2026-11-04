@@ -3,6 +3,44 @@
 All notable changes to Kensaku. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning: [SemVer](https://semver.org/).
 
+## [1.0.14] — 2026-11-04
+
+### Added
+- **Seamless in-app updater**: Updates no longer require manually navigating
+  GitHub release pages. When an update is detected, an update badge appears on
+  the status bar and in **Settings → About**, showing the release notes, asset
+  size, and download progress bar. Users can download and install updates with a
+  single click; the installer executes detached and Kensaku cleanly shuts down
+  to prevent process lock conflicts.
+- **Configurable auto-update checks**: Background update checks (once every
+  12 hours) are enabled by default and can be toggled on/off in **Settings → About**.
+- **One-click GitHub issue reporting**: Health check failures, OCR warnings,
+  and About settings now include a direct "Report Issue" action that copies complete
+  system and index diagnostics to the clipboard and opens a pre-filled GitHub
+  issue in the default browser.
+- **Automated ONNX Runtime build staging**: Development and test builds automatically
+  stage the required ONNX Runtime dynamic library (`onnxruntime.dll` / `libonnxruntime.so` /
+  `libonnxruntime.dylib`) to target directories via `build.rs`.
+
+### Fixed
+- **Indra OCR Cyrillic recall** (#93): Indra OCR now falls back to the comprehensive
+  base recognizer (`rec.onnx` + vocabulary) when specialized script models return
+  empty or low-confidence results, restoring 100% recall for Cyrillic and mixed-script
+  screenshots.
+- **ONNX Runtime anti-hijacking**: The dynamic library loader in `ocr.rs` now verifies
+  explicit paths (`deps/`, `debug/`, `src-tauri/`, config/model folders) and eliminates
+  the bare library fallback on Windows that was silently loading older, incompatible
+  copies from `C:\Windows\System32\onnxruntime.dll`.
+- **Transparent OCR error reporting**: `self_test()` and text extraction now return
+  explicit `OcrOutcome::Unavailable(reason)` and expose detailed diagnostics rather
+  than masking failures as silent blank text (`NoText`).
+- **Linux AppImage system Tesseract isolation** (#93): Sanitized the execution
+  environment when invoking host system `/usr/bin/tesseract` inside AppImages by
+  clearing `APPDIR` and restoring `LD_LIBRARY_PATH_ORIG`, preventing crashes caused by
+  linking against bundled AppImage libraries.
+- **Doctor health auditing**: Added active auditing of `indra_status()` to the Doctor
+  suite whenever Indra is configured as the active OCR engine.
+
 ## [1.0.13] — 2026-11-04
 
 ### Added

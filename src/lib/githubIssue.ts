@@ -25,7 +25,7 @@ export function detectPlatform(): "Linux" | "macOS (Intel)" | "macOS (Apple Sili
  * while copying full diagnostics to the clipboard so nothing is lost.
  */
 export async function openGitHubBugReport(options: ReportOptions = {}): Promise<{ copied: boolean }> {
-  let version = "1.0.13";
+  let version = "1.0.14";
   try {
     version = await getVersion();
   } catch {

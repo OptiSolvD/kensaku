@@ -222,7 +222,7 @@ Full threat model: [SECURITY.md](SECURITY.md).
 
 ## Status
 
-**Shipping now (1.0.13)**
+**Shipping now (1.0.14)**
 
 - Desktop app for Windows, macOS, and Linux: light and dark themes, grid and list results, infinite scroll, thumbnails, hover details, right-click actions
 - Two window modes: a normal desktop app (setup default) or a tray launcher with a global summon keystroke and memory trimmed while hidden
@@ -236,7 +236,7 @@ Full threat model: [SECURITY.md](SECURITY.md).
 
 **Known limitations**
 
-- Builds are not yet code-signed, and the auto-updater is not wired up yet.
+- Builds are not yet code-signed; in-app updating is fully supported with 1-click install and configurable background checks.
 - OCR: PP-OCRv6 by default (bundled runtime, ~6 MB model pack downloaded on first run); optional Indra engine with
   deskew and multi-script recognition (~27 MB pack, downloaded on demand). Intel Macs fall back to Tesseract.
   JPEG 2000, fax and JBIG2 scans are not decoded yet.
