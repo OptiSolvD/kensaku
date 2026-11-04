@@ -266,16 +266,16 @@ fn tesseract_command() -> Command {
     {
         if let Ok(orig) = std::env::var("LD_LIBRARY_PATH_ORIG") {
             command.env("LD_LIBRARY_PATH", orig);
-        } else if let Ok(appdir) = std::env::var("APPDIR") {
-            if let Ok(current) = std::env::var("LD_LIBRARY_PATH") {
-                let cleaned: Vec<_> = std::env::split_paths(&current)
-                    .filter(|p| !p.starts_with(&appdir))
-                    .collect();
-                if cleaned.is_empty() {
-                    command.env_remove("LD_LIBRARY_PATH");
-                } else if let Ok(joined) = std::env::join_paths(cleaned) {
-                    command.env("LD_LIBRARY_PATH", joined);
-                }
+        } else if let Ok(appdir) = std::env::var("APPDIR")
+            && let Ok(current) = std::env::var("LD_LIBRARY_PATH")
+        {
+            let cleaned: Vec<_> = std::env::split_paths(&current)
+                .filter(|p| !p.starts_with(&appdir))
+                .collect();
+            if cleaned.is_empty() {
+                command.env_remove("LD_LIBRARY_PATH");
+            } else if let Ok(joined) = std::env::join_paths(cleaned) {
+                command.env("LD_LIBRARY_PATH", joined);
             }
         }
     }
