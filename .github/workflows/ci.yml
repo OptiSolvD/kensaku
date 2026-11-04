@@ -14,7 +14,10 @@ concurrency:
 jobs:
   web:
     name: Web
-    runs-on: ubuntu-latest
+    # ubuntu-24.04 is pinned: `ubuntu-latest` will migrate to Ubuntu 26
+    # (actions/runner-images#14748), which would change the toolchain layout
+    # under this job without notice.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2

@@ -1,0 +1,32 @@
+# github.com/yjid/kensaku
+#
+# The `glib` crate sits in both lockfiles at 0.18 via Tauri 2's GTK 0.18
+# stack. RUSTSEC-2024-0429 marks glib >= 0.15.0, < 0.20.0 as affected, so
+# Dependabot keeps launching security updates for it and every run fails
+# with `security_update_not_possible`: the earliest fixed version is 0.20.0,
+# which cargo cannot resolve next to tauri/gtk 0.18. Ignore it until the
+# Tauri crate stack moves to gtk 0.20+, and dismiss the Dependabot alerts
+# as "no fix available".
+#
+# Practical risk is low either way: glib is transitively pulled by gtk and
+# only linked on Linux, Kensaku never calls `VariantStrIter`, and per the
+# advisory the unsoundness manifests as NULL-deref crashes, not
+# attacker-controlled undefined behavior.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /src-tauri
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: glib
+  - package-ecosystem: cargo
+    directory: /cli
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: glib
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

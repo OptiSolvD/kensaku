@@ -143,12 +143,33 @@ function App() {
     /* Compare against the running app's real version, and only flag a
        strictly newer release: "not equal" offered a downgrade whenever the
        latest published release was older than this build. */
-    Promise.all([
-      getVersion(),
-      fetch("https://api.github.com/repos/yjid/kensaku/releases/latest").then((r) => r.json()),
-    ])
-      .then(([current, latest]: [string, { tag_name?: string }]) => {
-        const tag = String(latest?.tag_name || "").replace(/^v/, "");
+    /* The search window is recreated every time it opens, so without a
+       throttle this asked GitHub on every open. Once every 12 hours, with
+       the answer remembered in between. */
+    const KEY = "kensaku.updateCheck";
+    const TTL_MS = 12 * 60 * 60 * 1000;
+    let cached: { at: number; tag: string } | null = null;
+    try {
+      cached = JSON.parse(localStorage.getItem(KEY) || "null");
+    } catch {
+      cached = null;
+    }
+    const fresh = cached && Date.now() - cached.at < TTL_MS;
+    const latestTag: Promise<string> = fresh
+      ? Promise.resolve(cached!.tag)
+      : fetch("https://api.github.com/repos/yjid/kensaku/releases/latest")
+          .then((r) => r.json())
+          .then((latest: { tag_name?: string }) => {
+            const tag = String(latest?.tag_name || "").replace(/^v/, "");
+            try {
+              localStorage.setItem(KEY, JSON.stringify({ at: Date.now(), tag }));
+            } catch {
+              /* storage unavailable */
+            }
+            return tag;
+          });
+    Promise.all([getVersion(), latestTag])
+      .then(([current, tag]) => {
         if (tag && isNewerVersion(tag, current)) setUpdateAvailable(tag);
       })
       .catch(() => {});

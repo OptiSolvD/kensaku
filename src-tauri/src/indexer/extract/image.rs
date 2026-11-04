@@ -739,6 +739,11 @@ pub fn thumbnail_path(path: &Path, out_dir: &Path) -> PathBuf {
 /// written to a temporary file and renamed into place so readers never observe
 /// a partially written JPEG.
 pub fn thumbnail(path: &Path, out_dir: &Path) -> Option<PathBuf> {
+    // Decoding a cloud-only file downloads it. Thumbnails are opportunistic
+    // (grid, hash backfill), so skip instead of pulling the file down.
+    if crate::indexer::walker::is_cloud_placeholder_path(path) {
+        return None;
+    }
     let target = thumbnail_path(path, out_dir);
     if is_fresh(&target, path) {
         return Some(target);

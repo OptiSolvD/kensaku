@@ -195,8 +195,10 @@ Results are deterministic: score, then path.
   text is indexed, and saving re-scans existing images. Thumbnails and dimensions
   are cached; near-duplicates use a perceptual hash, and screenshot bursts also
   compare OCR line overlap so a shared sidebar does not merge distinct pages.
-- **Cloud placeholders** (Windows OneDrive/iCloud) are indexed by name only, so
-  reading doesn't hydrate the file.
+- **Cloud placeholders** (Windows OneDrive/iCloud, and macOS iCloud Drive via
+  the APFS `SF_DATALESS` flag) are indexed by name only, so reading doesn't
+  hydrate the file. Their sparse folders are listed but not descended into,
+  and results-grid previews never download from the cloud.
 
 ## Agents
 
