@@ -11,7 +11,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::str::FromStr;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 
 static CURRENT_SEARCH_SEQ: AtomicU64 = AtomicU64::new(0);
@@ -955,9 +955,16 @@ pub async fn save_config(config: KensakuConfig, state: State<'_, AppState>, app:
     } else {
         state.indexer.apply_config(config.clone())?;
     }
-    // Re-register the global shortcut so a newly chosen key works without a restart.
+    // Apply window-mode changes to the live window, then re-register the
+    // global shortcut so a newly chosen key works without a restart. App mode
+    // has no summon shortcut: the window is already in the taskbar.
+    if let Some(window) = app.get_webview_window(crate::main_window::LABEL) {
+        crate::main_window::apply_mode(&window, &config.app_mode);
+    }
     let _ = app.global_shortcut().unregister_all();
-    if let Ok(sc) = Shortcut::from_str(&config.shortcut) {
+    if config.app_mode == "launcher"
+        && let Ok(sc) = Shortcut::from_str(&config.shortcut)
+    {
         let _ = app.global_shortcut().register(sc);
     }
     Ok(())
@@ -1029,10 +1036,15 @@ pub async fn complete_setup(
         state.indexer.start_indexing();
     }
 
-    // Register the chosen global shortcut immediately so onboarding's choice
-    // works without a restart.
+    // Apply the chosen window mode to the setup window immediately, then
+    // register the global shortcut only in launcher mode.
+    if let Some(window) = app.get_webview_window(crate::main_window::LABEL) {
+        crate::main_window::apply_mode(&window, &config.app_mode);
+    }
     let _ = app.global_shortcut().unregister_all();
-    if let Ok(sc) = Shortcut::from_str(&config.shortcut) {
+    if config.app_mode == "launcher"
+        && let Ok(sc) = Shortcut::from_str(&config.shortcut)
+    {
         let _ = app.global_shortcut().register(sc);
     }
 

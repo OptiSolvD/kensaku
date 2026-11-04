@@ -58,6 +58,10 @@ export function SetupModal({ onSetupCompleted }: { onSetupCompleted: () => void 
   const [selectedOcrEngine, setSelectedOcrEngine] = useState<OcrEngine | null>(null);
   const [packError, setPackError] = useState<string | null>(null);
   const [shortcut, setShortcut] = useState("Alt+Space");
+  // New installs open as a regular desktop app: people who expect a window
+  // shouldn't have to discover the launcher model first. Launcher mode stays
+  // one click away, here and in Settings.
+  const [appMode, setAppMode] = useState<"app" | "launcher">("app");
   const [capturing, setCapturing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [scanning, setScanning] = useState(false);
@@ -247,7 +251,7 @@ export function SetupModal({ onSetupCompleted }: { onSetupCompleted: () => void 
         // Keep the backend's engine choice when the user did not touch the
         // radios (e.g. status never loaded) instead of resetting to a name.
         ocrEngine: selectedOcrEngine ?? (ocrStatus ? pickEngine(ocrStatus) : "tesseract"),
-        appMode: "launcher",
+        appMode,
       });
       // The default text model downloads without asking. Failure is not fatal:
       // keyword search works without it, and Settings can retry.
@@ -593,13 +597,46 @@ export function SetupModal({ onSetupCompleted }: { onSetupCompleted: () => void 
       )}
 
       {step === 2 && (
-        <div key="s2" className="section-enter flex min-h-0 flex-1 flex-col gap-10 overflow-y-auto pt-2">
+        <div key="s2" className="section-enter flex min-h-0 flex-1 flex-col gap-8 overflow-y-auto pt-2">
           <div className="space-y-2">
-            <h1 className="t-title text-fg">Summon it from anywhere</h1>
-            <p className="t-lead text-muted">Kensaku runs as an ultra-light background daemon. It opens with your shortcut, hides when you click away or press Esc, and stays in the tray.</p>
+            <h1 className="t-title text-fg">
+              {appMode === "app" ? "Open it like an app" : "Summon it from anywhere"}
+            </h1>
+            <p className="t-lead text-muted">
+              {appMode === "app"
+                ? "Kensaku opens as a normal window, stays in your taskbar, and keeps the index warm while it is open."
+                : "Kensaku runs as an ultra-light background daemon. It opens with your shortcut, hides when you click away or press Esc, and stays in the tray."}
+            </p>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-2">
+            <p className="t-meta text-subtle">Window mode</p>
+            <div role="radiogroup" aria-label="Window mode" className="pill-group w-full">
+              {(["app", "launcher"] as const).map((mode) => {
+                const active = appMode === mode;
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => setAppMode(mode)}
+                    className="pill flex-1"
+                  >
+                    {mode === "app" ? "Desktop app" : "Launcher"}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[12px] text-subtle">
+              {appMode === "app"
+                ? "Closing the window quits Kensaku. Reopen it from the taskbar or your app menu."
+                : "Closing the window hides it; Kensaku keeps running in the tray. You can switch modes later in Settings."}
+            </p>
+          </div>
+
+          {appMode === "launcher" && (
+            <div className="space-y-4">
               <div className="space-y-1">
                 <p className="text-[13px] text-muted">Esc hides it again. Kensaku keeps running quietly.</p>
               </div>
@@ -623,9 +660,13 @@ export function SetupModal({ onSetupCompleted }: { onSetupCompleted: () => void 
                 On Linux with Wayland, bind a system shortcut to <code className="font-mono text-[11px]">kensaku --toggle</code> if the key doesn't register.
               </p>
             </div>
-          <p className="text-[13px] font-medium leading-[18px] text-blue">
-            Closing the window just hides Kensaku, it keeps running. If it seems to disappear, press your shortcut or look in the tray.
-          </p>
+          )}
+
+          {appMode === "launcher" && (
+            <p className="text-[13px] font-medium leading-[18px] text-blue">
+              Closing the window just hides Kensaku, it keeps running. If it seems to disappear, press your shortcut or look in the tray.
+            </p>
+          )}
         </div>
       )}
 

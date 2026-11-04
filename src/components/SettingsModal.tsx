@@ -381,8 +381,40 @@ function GeneralSection({
         </div>
       </Card>
 
+      <Card title="Window">
+        <Field
+          label="Mode"
+          description="Desktop app stays in the taskbar and quits when you close it. Launcher hides on Esc or when you click away, and keeps running in the tray."
+        >
+          <div role="radiogroup" aria-label="Window mode" className="pill-group">
+            {(["app", "launcher"] as const).map((mode) => {
+              const active = (config.app_mode ?? "launcher") === mode;
+              return (
+                <button
+                  key={mode}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => setConfig((c) => (c ? { ...c, app_mode: mode } : c))}
+                  className="pill"
+                >
+                  {mode === "app" ? "App" : "Launcher"}
+                </button>
+              );
+            })}
+          </div>
+        </Field>
+      </Card>
+
       <Card title="Invocation">
-        <Field label="Quick shortcut" description="Press it from anywhere to open search. Click, then press a combo to change it. On Linux Wayland, desktops may block global keys: bind a shortcut to the command kensaku --toggle instead.">
+        <Field
+          label="Quick shortcut"
+          description={
+            config.app_mode === "app"
+              ? "Only used in launcher mode; the desktop app opens from the taskbar."
+              : "Press it from anywhere to open search. Click, then press a combo to change it. On Linux Wayland, desktops may block global keys: bind a shortcut to the command kensaku --toggle instead."
+          }
+        >
           <button
             type="button"
             onClick={() => setCapturing(true)}

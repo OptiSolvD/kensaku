@@ -206,6 +206,13 @@ pub fn run() {
     // captured too. It only touches the config directory path; it never loads
     // or mutates the config.
     crashlog::install_panic_hook();
+    crashlog::info(&format!(
+        "starting {} {} ({} {})",
+        env!("CARGO_PKG_NAME"),
+        env!("CARGO_PKG_VERSION"),
+        std::env::consts::OS,
+        std::env::consts::ARCH
+    ));
 
     commands::init_process_start();
 
@@ -234,6 +241,10 @@ pub fn run() {
     }
 
     let config = KensakuConfig::load();
+    crashlog::info(&format!(
+        "config loaded: setup_complete={} app_mode={} ocr_enabled={} engine={}",
+        config.is_setup_complete, config.app_mode, config.ocr_enabled, config.ocr_engine
+    ));
     indexer::extract::set_ocr_enabled(config.ocr_enabled);
     indexer::extract::image::set_ocr_max_image_bytes(config.ocr_max_image_bytes);
     indexer::extract::set_content_caps(config.content_max_file_size_mb, config.content_max_text_bytes);
