@@ -14,10 +14,10 @@ fn main() {
     let dll_name = "libonnxruntime.dylib";
 
     let src_dll = manifest_dir.join(dll_name);
-    if src_dll.is_file() {
-        if let Some(target_dir) = out_dir.ancestors().nth(3) {
-            let _ = std::fs::copy(&src_dll, target_dir.join(dll_name));
-            let _ = std::fs::copy(&src_dll, target_dir.join("deps").join(dll_name));
-        }
+    if src_dll.is_file()
+        && let Some(target_dir) = out_dir.ancestors().nth(3)
+    {
+        let _ = std::fs::copy(&src_dll, target_dir.join(dll_name));
+        let _ = std::fs::copy(&src_dll, target_dir.join("deps").join(dll_name));
     }
 }
