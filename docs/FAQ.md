@@ -1,9 +1,12 @@
 # FAQ
 
 **Is anything sent to the cloud?**
-No. There is no telemetry and no account. The only network request is an optional
-model or OCR language download you choose during setup (currently surfaced in
-Settings).
+No. There is no telemetry and no account, and search queries or file contents
+never leave your machine. Kensaku makes two kinds of outbound requests: a GitHub
+release check about once every 12 hours, and model/OCR pack downloads. The
+default text model downloads automatically after setup, and OCR data for the
+enabled engine may download automatically while OCR is on; the optional Indra,
+smart-embedding, and visual packs are user-initiated.
 
 **Why is the first launch slow?**
 It builds the index. The guided first run completes the initial scan before
@@ -91,8 +94,8 @@ A local LLM is a multi-gigabyte dependency and a different product. Kensaku stay
 the fast, trustworthy index by default. An **optional** local Ollama/LM Studio
 connection may compile plain-language intent and power `/ask` with path
 citations; agents bring their own model through MCP. No model is bundled, and
-nothing leaves the machine unless you explicitly configure a cloud provider.
-No. Kensaku is local-first by design.
+file contents never leave the machine unless you explicitly configure a cloud
+provider — Kensaku is local-first by design.
 
 **How do I contribute?**
 See [`CONTRIBUTING.md`](CONTRIBUTING.md). Tests and clippy must pass.
