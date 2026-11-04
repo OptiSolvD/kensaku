@@ -46,8 +46,9 @@ be safe when pointed at untrusted files.
 - **Local only.** No telemetry and no data about your files or searches leaves
   the machine. Outbound requests are limited to a periodic GitHub release check
   (no payload beyond the request itself) and model/OCR pack downloads. The
-  default text model downloads after setup; OCR and visual packs are
-  user-initiated.
+  default text model downloads after setup; OCR data for the enabled engine may
+  download automatically while OCR is on; optional Indra, smart-embedding, and
+  visual packs are user-initiated.
 
 ## Sensitive data
 

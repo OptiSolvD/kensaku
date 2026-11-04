@@ -3,9 +3,10 @@
 **Is anything sent to the cloud?**
 No. There is no telemetry and no account, and search queries or file contents
 never leave your machine. Kensaku makes two kinds of outbound requests: a GitHub
-release check at most once every 12 hours, and model/OCR pack downloads (the
-default text model downloads after setup; OCR and visual packs are
-user-initiated).
+release check about once every 12 hours, and model/OCR pack downloads. The
+default text model downloads automatically after setup, and OCR data for the
+enabled engine may download automatically while OCR is on; the optional Indra,
+smart-embedding, and visual packs are user-initiated.
 
 **Why is the first launch slow?**
 It builds the index. The guided first run completes the initial scan before

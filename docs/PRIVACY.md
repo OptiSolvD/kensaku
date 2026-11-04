@@ -8,12 +8,14 @@ Kensaku is local-first. Everything below describes the shipped behavior.
 - No account, no sign-in, no cloud search.
 - No telemetry, no account, no analytics: search queries, file names, and usage
   data are never sent anywhere.
-- Kensaku checks GitHub's public releases API for a newer version at most once
-  every 12 hours. The request carries no identifiers or usage data; blocking
+- Kensaku checks GitHub's public releases API for a newer version about once
+  every 12 hours. The request contains no search, file, or usage data; blocking
   `api.github.com` in your firewall disables the check.
-- Network access is otherwise used only to download model packs or OCR language
-  data. The default text model downloads automatically after setup; OCR and
-  visual packs download when you choose them.
+- Model downloads fetch files from their configured source (Hugging Face or a
+  mirror). The default text model downloads automatically after setup, and OCR
+  data for the enabled engine may download automatically while OCR is on. The
+  optional Indra, smart-embedding, and visual packs download only when you
+  choose them.
 
 ## What leaves the machine
 
