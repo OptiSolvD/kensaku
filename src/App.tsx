@@ -127,7 +127,10 @@ function App() {
     invoke<KensakuConfig>("get_config")
       .then(setConfig)
       .catch(() => undefined);
-  }, [showSettings]);
+    // Reload after setup too: the wizard saves the chosen window mode, and a
+    // stale launcher-mode snapshot would make app mode hide on the first open
+    // or Escape press.
+  }, [showSettings, isSetupComplete]);
   /* The backend config is the durable copy of the theme — localStorage does
      not survive the launcher destroying its webview on hide. Re-apply the
      persisted pick on every (re)mount so close/open keeps the chosen finish. */
