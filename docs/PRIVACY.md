@@ -6,16 +6,21 @@ Kensaku is local-first. Everything below describes the shipped behavior.
 
 - The index (metadata, full-text, embeddings) lives in your OS config directory.
 - No account, no sign-in, no cloud search.
-- No telemetry and no update checks: the app never phones home.
-- Network access is used only when you explicitly download an optional model
-  pack or OCR language data.
+- No telemetry, no account, no analytics: search queries, file names, and usage
+  data are never sent anywhere.
+- Kensaku checks GitHub's public releases API for a newer version at most once
+  every 12 hours. The request carries no identifiers or usage data; blocking
+  `api.github.com` in your firewall disables the check.
+- Network access is otherwise used only to download model packs or OCR language
+  data. The default text model downloads automatically after setup; OCR and
+  visual packs download when you choose them.
 
 ## What leaves the machine
 
-- Nothing during normal search.
-- Model/OCR downloads fetch files from their configured source when you click
-  Download. Those requests go to the model host, not to Kensaku servers (there
-  are none).
+- Nothing about your files or searches during normal search.
+- An update check to GitHub (see above).
+- Model/OCR downloads fetch files from their configured source. Those requests
+  go to the model host, not to Kensaku servers (there are none).
 
 ## MCP server
 

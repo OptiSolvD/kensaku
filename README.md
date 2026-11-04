@@ -210,7 +210,7 @@ Indexing is a single pass: each file is read once and feeds both the name and te
 
 ## Privacy and security
 
-- **Local by default.** No telemetry, no account, no cloud search. Zero bytes leave your machine.
+- **Local by default.** No telemetry, no account, no cloud search. Search queries and file contents never leave your machine; the only outbound requests are an update check and model/OCR downloads.
 - **You choose what is indexed.** Watched folders and exclusions are yours. Hidden files and common build folders are skipped by default, and credential files such as `.pem`, `.key`, and `.pfx` are excluded.
 - **Bounded processing.** Each file has a time limit and a size limit, so one bad file can't stall the index.
 - **Read-only agent access.** The agent tools cannot change files. `reindex` is off unless you enable it.

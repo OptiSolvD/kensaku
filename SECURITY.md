@@ -43,8 +43,11 @@ be safe when pointed at untrusted files.
   without a Content-Security-Policy; tightening it is tracked as hardening work,
   and the app loads no remote content.
 - **Default exclusions** skip hidden files and common junk directories.
-- **Local only.** No telemetry. The only outbound request is the optional model
-  download, initiated by the user.
+- **Local only.** No telemetry and no data about your files or searches leaves
+  the machine. Outbound requests are limited to a periodic GitHub release check
+  (no payload beyond the request itself) and model/OCR pack downloads. The
+  default text model downloads after setup; OCR and visual packs are
+  user-initiated.
 
 ## Sensitive data
 
