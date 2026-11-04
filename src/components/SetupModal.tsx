@@ -6,7 +6,7 @@ import { useTranslation, Trans } from "react-i18next";
 import type { TFunction } from "i18next";
 import { Check, Plus, ArrowRight, ArrowLeft, LoaderCircle, Sun, Moon, Download, X, FolderOpen, Minus } from "lucide-react";
 import { useTheme } from "../hooks/useTheme";
-import type { IndexingStatus, OcrEngine, OcrStatus, ModelsStatus } from "../types";
+import type { IndexingStatus, KensakuConfig, OcrEngine, OcrStatus, ModelsStatus } from "../types";
 
 /* First run: three screens, one decision each.
    1 Welcome → 2 Pick folders → 3 Exclusions + start. */
@@ -77,6 +77,13 @@ export function SetupModal({ onSetupCompleted }: { onSetupCompleted: () => void 
   // shouldn't have to discover the launcher model first. Launcher mode stays
   // one click away, here and in Settings.
   const [appMode, setAppMode] = useState<"app" | "launcher">("app");
+  /* Set once the user picks a mode, so the config lookup below cannot
+     overwrite a click that races the invoke. */
+  const appModeTouched = useRef(false);
+  const chooseAppMode = (mode: "app" | "launcher") => {
+    appModeTouched.current = true;
+    setAppMode(mode);
+  };
   const [capturing, setCapturing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [scanning, setScanning] = useState(false);
@@ -104,6 +111,19 @@ export function SetupModal({ onSetupCompleted }: { onSetupCompleted: () => void 
     invoke<boolean>("is_setup_configured")
       .then((configured) => {
         if (configured) setScanning(true);
+      })
+      .catch(() => {});
+
+    // Running setup again keeps the existing mode; only a genuinely fresh
+    // install starts on the app default. Watched folders are saved by
+    // `complete_setup`, so a non-empty list means this config predates the
+    // wizard run.
+    invoke<KensakuConfig>("get_config")
+      .then((cfg) => {
+        if (appModeTouched.current) return;
+        if ((cfg.watched_dirs?.length ?? 0) > 0) {
+          setAppMode(cfg.app_mode === "launcher" ? "launcher" : "app");
+        }
       })
       .catch(() => {});
   }, []);
@@ -640,7 +660,7 @@ export function SetupModal({ onSetupCompleted }: { onSetupCompleted: () => void 
                     type="button"
                     role="radio"
                     aria-checked={active}
-                    onClick={() => setAppMode(mode)}
+                    onClick={() => chooseAppMode(mode)}
                     className="pill flex-1"
                   >
                     {mode === "app" ? t("mode.app") : t("mode.launcher")}
