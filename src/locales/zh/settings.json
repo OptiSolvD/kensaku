@@ -207,7 +207,7 @@
   "about": {
     "resetPending": "有一个待处理的重置，将在下次启动时完成。",
     "version": "版本",
-    "autoUpdate": "尚未接入自动更新——目前需手动更新。",
+    "autoUpdate": "默认启用自动检查更新。",
     "checkUpdates": "检查更新",
     "opening": "正在打开…",
     "opensRelease": "在浏览器中打开最新版本页面。",
@@ -250,7 +250,22 @@
       "cancelButton": "取消",
       "resetting": "正在重置…",
       "resetAndRestart": "重置并重启"
-    }
+    },
+    "reportIssue": "反馈问题",
+    "autoUpdateSetting": "自动检查更新",
+    "autoUpdateSettingDesc": "在后台定期检查新版本与功能优化。",
+    "checking": "正在检查更新…",
+    "upToDate": "Kensaku 已是最新版本",
+    "updateAvailable": "新版本 {{version}} 可用",
+    "downloadAndInstall": "下载并安装更新",
+    "downloading": "正在下载更新…",
+    "downloadPercent": "正在下载更新… {{percent}}% ({{downloaded}} / {{total}})",
+    "readyToInstall": "更新已准备就绪",
+    "installAndRestart": "立即重启并安装",
+    "viewReleaseNotes": "在 GitHub 上查看",
+    "publishedOn": "发布于 {{date}}",
+    "downloadFailed": "更新下载失败：{{error}}",
+    "noAssetFound": "未找到适合当前平台的安装包，请从 GitHub 手动下载。"
   },
   "models": {
     "title": "模型文件",
@@ -298,7 +313,8 @@
     "otherPlatforms": "其他平台",
     "recheck": "重新检查",
     "languageData": "语言数据会在设置向导中下载。使用 关于 → 重新运行设置向导 获取，然后在此重新检查。",
-    "languageDataBold": "关于 → 重新运行设置向导"
+    "languageDataBold": "关于 → 重新运行设置向导",
+    "reportIssue": "反馈问题"
   },
   "doctor": {
     "copyReport": "复制报告",
@@ -319,7 +335,11 @@
     "ok": "正常",
     "warning": "警告",
     "fail": "失败",
-    "copyFix": "复制修复命令"
+    "copyFix": "复制修复命令",
+    "reportIssue": "在 GitHub 上反馈",
+    "reportOpened": "正在打开 GitHub…",
+    "reportTooltip": "在 GitHub 上打开预填的错误报告",
+    "hasIssuesNotice": "诊断检测到问题。您可以直接在 GitHub 上提交预填的错误报告。"
   },
   "stats": {
     "polled": "每 2 秒从 get_stats 轮询",

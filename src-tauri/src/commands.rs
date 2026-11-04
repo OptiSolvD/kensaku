@@ -1616,3 +1616,33 @@ pub async fn get_thumbnail_data(path: String) -> Result<String, String> {
     .await
     .map_err(|e| format!("Thumbnail task failed: {}", e))?
 }
+
+/// Checks GitHub for new Kensaku releases.
+#[tauri::command]
+pub async fn check_for_updates() -> Result<crate::updater::UpdateInfo, String> {
+    tauri::async_runtime::spawn_blocking(crate::updater::check_for_update)
+        .await
+        .map_err(|e| format!("Update check task failed: {}", e))?
+}
+
+/// Downloads the specified update asset in the background.
+#[tauri::command]
+pub async fn download_update(asset_url: String, asset_name: String) -> Result<crate::updater::UpdateStatus, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::updater::download_update(&asset_url, &asset_name)
+    })
+    .await
+    .map_err(|e| format!("Update download task failed: {}", e))?
+}
+
+/// Polls progress of an in-progress update download.
+#[tauri::command]
+pub async fn get_updater_status() -> Result<crate::updater::UpdateStatus, String> {
+    Ok(crate::updater::get_status())
+}
+
+/// Spawns the downloaded installer detached and shuts down the current app instance.
+#[tauri::command]
+pub async fn install_update_and_restart(app: AppHandle) -> Result<(), String> {
+    crate::updater::install_and_restart(&app)
+}

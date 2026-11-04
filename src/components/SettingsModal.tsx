@@ -5,6 +5,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   Bot,
+  Bug,
   Check,
   Copy,
   Filter,
@@ -13,6 +14,10 @@ import {
   Plus,
   RefreshCw,
   Save,
+  Download,
+  CheckCircle2,
+  AlertCircle,
+  ExternalLink,
   Search,
   SlidersHorizontal,
   Sparkles,
@@ -34,6 +39,15 @@ import { StatsForNerds } from "./settings/stats";
 import { DoctorSection } from "./settings/doctor";
 import { ModelFilesCard } from "./settings/models";
 import { formatBytes, formatComma } from "../lib/format";
+import { openGitHubBugReport } from "../lib/githubIssue";
+import {
+  checkForUpdates,
+  downloadUpdate,
+  getUpdaterStatus,
+  installUpdateAndRestart,
+  formatReleaseDate,
+} from "../lib/updater";
+import type { UpdateInfo, UpdateStatus } from "../types";
 
 export interface SettingsProps {
   onClose: () => void;
@@ -239,7 +253,7 @@ function renderSection(
         </>
       );
     case "about":
-      return <AboutSection />;
+      return <AboutSection config={config} setConfig={setConfig} />;
   }
 }
 
@@ -1479,12 +1493,22 @@ function ResetDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
-function AboutSection() {
+function AboutSection({
+  config,
+  setConfig,
+}: {
+  config: KensakuConfig | null;
+  setConfig: React.Dispatch<React.SetStateAction<KensakuConfig | null>>;
+}) {
   const { t } = useTranslation("settings");
   const resetPending = useResetPending();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [version, setVersion] = useState<string>("…");
   const [checking, setChecking] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [updaterError, setUpdaterError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -1500,14 +1524,58 @@ function AboutSection() {
     };
   }, []);
 
-  const checkForUpdates = async () => {
+  /* Poll updater progress while active */
+  useEffect(() => {
+    if (!downloading) return;
+    const interval = window.setInterval(async () => {
+      try {
+        const st = await getUpdaterStatus();
+        setUpdateStatus(st);
+        if (!st.busy) {
+          setDownloading(false);
+          if (st.error) setUpdaterError(st.error);
+        }
+      } catch (err) {
+        console.warn("Update status polling failed:", err);
+      }
+    }, 500);
+    return () => window.clearInterval(interval);
+  }, [downloading]);
+
+  const checkUpdatesNow = async () => {
     setChecking(true);
+    setUpdaterError(null);
     try {
-      await openUrl("https://github.com/yjid/kensaku/releases/latest");
-    } catch {
-      /* fall back to nothing; the link is also in the docs */
+      const info = await checkForUpdates();
+      setUpdateInfo(info);
+    } catch (err) {
+      setUpdaterError(String(err));
     } finally {
       setChecking(false);
+    }
+  };
+
+  const startDownload = async () => {
+    if (!updateInfo?.asset_url || !updateInfo?.asset_name) return;
+    setDownloading(true);
+    setUpdaterError(null);
+    try {
+      const st = await downloadUpdate(updateInfo.asset_url, updateInfo.asset_name);
+      setUpdateStatus(st);
+      if (st.ready_to_install) {
+        setDownloading(false);
+      }
+    } catch (err) {
+      setDownloading(false);
+      setUpdaterError(String(err));
+    }
+  };
+
+  const runInstall = async () => {
+    try {
+      await installUpdateAndRestart();
+    } catch (err) {
+      setUpdaterError(String(err));
     }
   };
 
@@ -1543,20 +1611,177 @@ function AboutSection() {
             ))}
           </div>
         </div>
-        <div className="border-t border-line px-4 py-3">
+
+        <Field
+          label={t("about.autoUpdateSetting")}
+          description={t("about.autoUpdateSettingDesc")}
+        >
+          <Switch
+            checked={config?.auto_update ?? true}
+            onChange={(v) =>
+              setConfig((c) => (c ? { ...c, auto_update: v } : c))
+            }
+          />
+        </Field>
+
+        <div className="flex items-center justify-between border-t border-line px-4 py-3">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={checkUpdatesNow}
+              disabled={checking || downloading}
+              className="btn btn-secondary h-8 !rounded-control"
+            >
+              <RefreshCw
+                className={`mr-1.5 h-3.5 w-3.5 ${checking ? "animate-spin text-accent" : "text-muted"}`}
+              />
+              {checking ? t("about.checking") : t("about.checkUpdates")}
+            </button>
+            <button
+              type="button"
+              onClick={() => openGitHubBugReport()}
+              className="btn btn-secondary h-8 !rounded-control"
+            >
+              <Bug className="mr-1.5 h-3.5 w-3.5 text-muted" />
+              {t("about.reportIssue")}
+            </button>
+          </div>
           <button
             type="button"
-            onClick={checkForUpdates}
-            disabled={checking}
-            className="btn btn-secondary h-8 !rounded-control"
+            onClick={() => openUrl("https://github.com/yjid/kensaku/releases/latest")}
+            className="flex items-center gap-1 text-[11px] text-subtle hover:text-fg transition-colors"
           >
-            {checking ? t("about.opening") : t("about.checkUpdates")}
+            <span>{t("about.opensRelease")}</span>
+            <ExternalLink className="h-3 w-3" />
           </button>
-          <span className="ml-3 text-[11px] text-subtle">
-            {t("about.opensRelease")}
-          </span>
         </div>
       </Card>
+
+      {/* Live In-App Update Card */}
+      {updaterError && (
+        <div className="rounded-control border border-warning/40 bg-elevated p-4">
+          <div className="flex items-start gap-2.5">
+            <AlertCircle className="h-4 w-4 shrink-0 text-warning mt-0.5" />
+            <div className="space-y-1">
+              <p className="text-[12px] font-medium text-warning">
+                {t("about.downloadFailed", { error: updaterError })}
+              </p>
+              <button
+                type="button"
+                onClick={() => openUrl("https://github.com/yjid/kensaku/releases/latest")}
+                className="btn btn-secondary h-7 text-[11px] mt-2 !rounded-control"
+              >
+                {t("about.viewReleaseNotes")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {updateInfo && !updaterError && (
+        <Card title={t("about.updateAvailable", { version: updateInfo.latest_version })}>
+          <div className="p-4 space-y-3">
+            {!updateInfo.has_update ? (
+              <div className="flex items-center gap-2 text-[13px] text-fg">
+                <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                <span>{t("about.upToDate")} (v{updateInfo.current_version})</span>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-medium text-accent">
+                        v{updateInfo.latest_version}
+                      </span>
+                      {updateInfo.published_at && (
+                        <span className="text-[11px] text-subtle">
+                          {t("about.publishedOn", { date: formatReleaseDate(updateInfo.published_at) })}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[13px] font-medium text-fg mt-1">
+                      {updateInfo.release_name}
+                    </p>
+                    {updateInfo.asset_name && (
+                      <p className="font-mono text-[11px] text-muted mt-0.5">
+                        {updateInfo.asset_name} {updateInfo.asset_size ? `(${formatBytes(updateInfo.asset_size)})` : ""}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Download Progress Bar */}
+                {downloading && updateStatus?.progress && (
+                  <div className="space-y-1.5 pt-1">
+                    <div className="flex items-center justify-between text-[11px] text-muted">
+                      <span>
+                        {t("about.downloadPercent", {
+                          percent: updateStatus.progress.percent,
+                          downloaded: formatBytes(updateStatus.progress.downloaded),
+                          total: formatBytes(updateStatus.progress.total),
+                        })}
+                      </span>
+                      <span>{updateStatus.progress.percent}%</span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-surface-2">
+                      <div
+                        className="h-full bg-accent transition-all duration-300"
+                        style={{ width: `${updateStatus.progress.percent}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-2 pt-2 border-t border-line">
+                  {updateStatus?.ready_to_install ? (
+                    <button
+                      type="button"
+                      onClick={runInstall}
+                      className="btn btn-primary h-8 !rounded-control flex items-center gap-1.5"
+                    >
+                      <Sparkles className="h-3.5 w-3.5" />
+                      {t("about.installAndRestart")}
+                    </button>
+                  ) : downloading ? (
+                    <button
+                      type="button"
+                      disabled
+                      className="btn btn-secondary h-8 !rounded-control flex items-center gap-1.5 opacity-75"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                      {t("about.downloading")}
+                    </button>
+                  ) : updateInfo.asset_url ? (
+                    <button
+                      type="button"
+                      onClick={startDownload}
+                      className="btn btn-primary h-8 !rounded-control flex items-center gap-1.5"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      {t("about.downloadAndInstall")}
+                    </button>
+                  ) : (
+                    <span className="text-[12px] text-muted">
+                      {t("about.noAssetFound")}
+                    </span>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => openUrl(updateInfo.release_url)}
+                    className="btn btn-secondary h-8 !rounded-control flex items-center gap-1.5"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5 text-muted" />
+                    {t("about.viewReleaseNotes")}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </Card>
+      )}
 
       <Card title={t("about.howTo")}>
         <div className="space-y-2 p-4 text-[12px] leading-[18px] text-muted">

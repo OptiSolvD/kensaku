@@ -193,6 +193,8 @@ export interface KensakuConfig {
   show_thumbnails?: boolean;
   /** Result layout. */
   results_view?: "grid" | "list";
+  /** Automatically check for updates on startup and in the background. */
+  auto_update?: boolean;
 }
 
 /* ---------------- Local LLM ---------------- */
@@ -420,4 +422,34 @@ export function emptyStats(): SystemStats {
       model_id: "",
     },
   };
+}
+
+/* ---------------- Auto Updater ---------------- */
+
+export interface UpdateInfo {
+  current_version: string;
+  latest_version: string;
+  has_update: boolean;
+  release_name: string;
+  release_notes: string;
+  release_url: string;
+  published_at: string;
+  asset_name?: string | null;
+  asset_url?: string | null;
+  asset_size?: number | null;
+}
+
+export interface UpdateProgress {
+  phase: "downloading" | "verifying" | "ready" | "error";
+  downloaded: number;
+  total: number;
+  percent: number;
+}
+
+export interface UpdateStatus {
+  busy: boolean;
+  progress?: UpdateProgress | null;
+  error?: string | null;
+  downloaded_path?: string | null;
+  ready_to_install: boolean;
 }

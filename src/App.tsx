@@ -39,6 +39,7 @@ import { classify } from "./lib/categories";
 import { interpretationLabel } from "./lib/interpretation";
 import { inFilter } from "./lib/query";
 import { isNewerVersion } from "./lib/version";
+import { checkForUpdates } from "./lib/updater";
 import { getVersion } from "@tauri-apps/api/app";
 import {
   Settings as SettingsIcon,
@@ -152,12 +153,14 @@ function App() {
   }, [isSetupComplete]);
 
   useEffect(() => {
+    if (config && config.auto_update === false) {
+      setUpdateAvailable(null);
+      return;
+    }
     /* Compare against the running app's real version, and only flag a
        strictly newer release: "not equal" offered a downgrade whenever the
        latest published release was older than this build. */
-    /* The search window is recreated every time it opens, so without a
-       throttle this asked GitHub on every open. Once every 12 hours, with
-       the answer remembered in between. */
+    /* Once every 12 hours, with the answer remembered in between. */
     const KEY = "kensaku.updateCheck";
     const TTL_MS = 12 * 60 * 60 * 1000;
     let cached: { at: number; tag: string } | null = null;
@@ -169,23 +172,23 @@ function App() {
     const fresh = cached && Date.now() - cached.at < TTL_MS;
     const latestTag: Promise<string> = fresh
       ? Promise.resolve(cached!.tag)
-      : fetch("https://api.github.com/repos/yjid/kensaku/releases/latest")
-          .then((r) => r.json())
-          .then((latest: { tag_name?: string }) => {
-            const tag = String(latest?.tag_name || "").replace(/^v/, "");
+      : checkForUpdates()
+          .then((info) => {
+            const tag = info.latest_version;
             try {
               localStorage.setItem(KEY, JSON.stringify({ at: Date.now(), tag }));
             } catch {
               /* storage unavailable */
             }
             return tag;
-          });
+          })
+          .catch(() => "");
     Promise.all([getVersion(), latestTag])
       .then(([current, tag]) => {
         if (tag && isNewerVersion(tag, current)) setUpdateAvailable(tag);
       })
       .catch(() => {});
-  }, []);
+  }, [config?.auto_update]);
 
   const showThumbs = config?.show_thumbnails !== false;
   const view: ResultView = config?.results_view === "list" ? "list" : "grid";
@@ -1330,7 +1333,7 @@ function App() {
                 </div>
               )}
 
-              <KeyHintStrip status={indexingStatus} doctor={doctorReport} updateAvailable={updateAvailable} onDoctor={() => { setShowSettings(true); setSettingsSection("doctor"); }} onUpdate={() => window.open("https://github.com/yjid/kensaku/releases/latest", "_blank")} />
+              <KeyHintStrip status={indexingStatus} doctor={doctorReport} updateAvailable={updateAvailable} onDoctor={() => { setShowSettings(true); setSettingsSection("doctor"); }} onUpdate={() => { setShowSettings(true); setSettingsSection("about"); }} />
             </>
           )}
         </>

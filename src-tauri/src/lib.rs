@@ -14,6 +14,7 @@ pub mod ocr_indra;
 pub mod preview;
 pub mod query;
 pub mod search;
+pub mod updater;
 pub mod util;
 
 use config::KensakuConfig;
@@ -386,6 +387,10 @@ pub fn run() {
             commands::agent_connect_status,
             commands::agent_connect_install,
             commands::agent_connect_snippet,
+            commands::check_for_updates,
+            commands::download_update,
+            commands::get_updater_status,
+            commands::install_update_and_restart,
             models::get_models_status,
             models::download_models,
             models::delete_models,

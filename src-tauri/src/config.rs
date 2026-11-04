@@ -206,6 +206,10 @@ pub struct KensakuConfig {
     /// Result layout: "grid" (cards, default) or "list" (one row per file).
     #[serde(default = "default_results_view")]
     pub results_view: String,
+    /// Automatically check for updates on startup and in the background.
+    /// Enabled by default; users can opt out in settings.
+    #[serde(default = "default_true")]
+    pub auto_update: bool,
     /// Config schema version, used for one-time migrations.
     #[serde(default)]
     pub config_version: u32,
@@ -457,6 +461,7 @@ impl Default for KensakuConfig {
             pins: Vec::new(),
             show_thumbnails: true,
             results_view: default_results_view(),
+            auto_update: true,
             config_version: CURRENT_CONFIG_VERSION,
         }
     }
@@ -757,10 +762,25 @@ mod tests {
     }
 
     #[test]
+    fn auto_update_default_and_roundtrip() {
+        let mut cfg = KensakuConfig::default();
+        assert!(cfg.auto_update);
+        cfg.auto_update = false;
+        let json = serde_json::to_string(&cfg).unwrap();
+        let loaded = KensakuConfig::load_from_str(&json);
+        assert!(!loaded.auto_update);
+
+        let json_without_flag = json.replace("\"auto_update\":false,", "");
+        let loaded_defaulted = KensakuConfig::load_from_str(&json_without_flag);
+        assert!(loaded_defaulted.auto_update);
+    }
+
+    #[test]
     fn default_config_is_current_version_and_dark() {
         let cfg = KensakuConfig::default();
         assert_eq!(cfg.config_version, CURRENT_CONFIG_VERSION);
         assert!(cfg.skip_hidden);
+        assert!(cfg.auto_update);
         assert!(cfg.ocr_enabled);
         assert_eq!(cfg.theme, "dark");
     }

@@ -207,7 +207,7 @@
   "about": {
     "resetPending": "A reset is pending and will finish on next launch.",
     "version": "Version",
-    "autoUpdate": "Auto-update isn't wired up yet — updates are manual.",
+    "autoUpdate": "Automatic update checking is enabled by default.",
     "checkUpdates": "Check for updates",
     "opening": "Opening…",
     "opensRelease": "Opens the latest release page in your browser.",
@@ -250,7 +250,22 @@
       "cancelButton": "Cancel",
       "resetting": "Resetting…",
       "resetAndRestart": "Reset and restart"
-    }
+    },
+    "reportIssue": "Report an issue",
+    "autoUpdateSetting": "Check for updates automatically",
+    "autoUpdateSettingDesc": "Periodically checks for new releases and improvements in the background.",
+    "checking": "Checking for updates…",
+    "upToDate": "Kensaku is up to date",
+    "updateAvailable": "Version {{version}} is available",
+    "downloadAndInstall": "Download & Install Update",
+    "downloading": "Downloading update…",
+    "downloadPercent": "Downloading update… {{percent}}% ({{downloaded}} / {{total}})",
+    "readyToInstall": "Update ready to install",
+    "installAndRestart": "Restart & Install Now",
+    "viewReleaseNotes": "View on GitHub",
+    "publishedOn": "Released on {{date}}",
+    "downloadFailed": "Update download failed: {{error}}",
+    "noAssetFound": "No compatible package found for your platform. Please download from GitHub."
   },
   "models": {
     "title": "Model files",
@@ -298,7 +313,8 @@
     "otherPlatforms": "Other platforms",
     "recheck": "Re-check",
     "languageData": "Language data is downloaded during setup. Use About → Run setup again to acquire it, then re-check here.",
-    "languageDataBold": "About → Run setup again"
+    "languageDataBold": "About → Run setup again",
+    "reportIssue": "Report issue"
   },
   "doctor": {
     "copyReport": "Copy report",
@@ -319,7 +335,11 @@
     "ok": "ok",
     "warning": "warning",
     "fail": "fail",
-    "copyFix": "Copy fix"
+    "copyFix": "Copy fix",
+    "reportIssue": "Report on GitHub",
+    "reportOpened": "Opening GitHub…",
+    "reportTooltip": "Open a pre-filled issue report on GitHub",
+    "hasIssuesNotice": "Diagnostics flagged an issue. You can open a pre-filled bug report directly on GitHub."
   },
   "stats": {
     "polled": "polled from get_stats every 2 s",
