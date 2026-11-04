@@ -289,7 +289,10 @@ pub fn walk_directories(
                     });
                     // Keep cloud-only folders as entries, but never list
                     // their contents: that is a network fetch (and, for a
-                    // phone over Phone Link, an "offline" popup).
+                    // phone over Phone Link, an "offline" popup). Detection
+                    // is Windows/macOS-only, so other platforms skip the
+                    // extra per-directory stat entirely.
+                    #[cfg(any(windows, target_os = "macos"))]
                     for entry in children.iter_mut().flatten() {
                         if entry.file_type.is_dir()
                             && let Ok(meta) = std::fs::metadata(entry.path())
