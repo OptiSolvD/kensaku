@@ -222,7 +222,7 @@ Full threat model: [SECURITY.md](SECURITY.md).
 
 ## Status
 
-**Shipping now (1.0.12)**
+**Shipping now (1.0.13)**
 
 - Desktop app for Windows, macOS, and Linux: light and dark themes, grid and list results, infinite scroll, thumbnails, hover details, right-click actions
 - Two window modes: a normal desktop app (setup default) or a tray launcher with a global summon keystroke and memory trimmed while hidden

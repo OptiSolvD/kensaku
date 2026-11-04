@@ -3,6 +3,35 @@
 All notable changes to Kensaku. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning: [SemVer](https://semver.org/).
 
+## [1.0.13] — 2026-11-04
+
+### Added
+- **Desktop app mode** (#89): setup now offers a normal, decorated window in
+  the taskbar/Dock (the default for new installs) or the existing tray
+  launcher. The mode is switchable later in **Settings → Window**; app mode
+  starts visible, is never hidden by the tray item or `--toggle`, and quits on
+  close, while launcher mode keeps the global summon shortcut, hides on Esc or
+  focus loss, and stays out of the taskbar.
+- **Simplified Chinese interface** (#70): the full UI — search, results,
+  dialogs, setup, settings, interpretation chips, relative times — is
+  translated, follows the system language, and can be changed in Settings.
+- Startup diagnostics (#77): milestones and errors are appended to
+  `crash.log`, and a window-creation failure now shows a non-blocking native
+  dialog with WebView2 guidance on Windows instead of exiting silently.
+
+### Fixed
+- **Cyclic reindexing** (#80): overflow events from large or network-backed
+  trees no longer restart a full walk on every signal. Rescans skip unchanged
+  entries and are coalesced behind a 60-second cooldown, so the indexer stops
+  pinning the CPU after the initial crawl.
+- Native `<select>` options and groups use theme-aware colors again, making the
+  sort and settings dropdowns readable in light and dark mode (#79).
+
+### Changed
+- Privacy documentation now distinguishes no telemetry, the roughly 12-hour
+  GitHub release check, and model/OCR downloads, instead of claiming that zero
+  bytes ever leave the machine (#78).
+
 ## [1.0.12] — 2026-11-03
 
 ### Added
