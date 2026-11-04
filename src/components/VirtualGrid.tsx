@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 /* Windowed results. Only rows inside the viewport (plus overscan) are mounted,
    so long result sets stay as light as short ones. Grid mode fits as many
@@ -52,6 +53,7 @@ export function VirtualGrid<T>({
   containerRef,
   insetTop = 0,
 }: VirtualGridProps<T>) {
+  const { t } = useTranslation("results");
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const setRefs = useCallback(
     (el: HTMLDivElement | null) => {
@@ -152,7 +154,7 @@ export function VirtualGrid<T>({
       <div style={{ height: contentHeight, position: "relative" }}>{rows}</div>
       {loading && (
         <div className="pointer-events-none sticky bottom-3 flex justify-center">
-          <span className="elevated fade-in t-meta !rounded-full px-3 py-1 text-muted">Loading more</span>
+          <span className="elevated fade-in t-meta !rounded-full px-3 py-1 text-muted">{t("loadingMore")}</span>
         </div>
       )}
     </div>

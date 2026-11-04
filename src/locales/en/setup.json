@@ -1,0 +1,95 @@
+{
+  "minimize": "Minimize",
+  "theme": "Theme",
+  "readyMark": "Ready",
+  "indexingMark": "Indexing",
+  "brand": {
+    "found": "found it.",
+    "search": "to search."
+  },
+  "done": {
+    "title": "Your files are ready.",
+    "pressShortcut": "Press <kbd>{{shortcut}}</kbd> from anywhere to search.",
+    "openFromTaskbar": "Kensaku is in your taskbar or Dock. Open it from there whenever you need it.",
+    "closingNote": "Closing the window just hides Kensaku, it keeps running in the background. If it seems to disappear, press your shortcut or look in the tray.",
+    "quitNote": "Closing the window quits Kensaku. Your index stays on disk, so the next launch is instant.",
+    "files": "Files",
+    "readInside": "Read inside",
+    "start": "Start searching"
+  },
+  "scan": {
+    "phases": {
+      "verifying": "Verifying files",
+      "walking": "Finding files",
+      "extracting": "Reading inside documents",
+      "embedding": "Learning what things mean",
+      "committing": "Saving the index",
+      "paused": "Paused",
+      "idle": "Finishing",
+      "starting": "Starting"
+    },
+    "ofFiles": "of {{total}} files",
+    "filesSoFar": "files so far",
+    "finishing": "Finishing",
+    "estimating": "Estimating",
+    "onlyFirstTime": "Only the first time. After this, every launch is instant.",
+    "eta": {
+      "seconds": "~{{seconds}}s left",
+      "minutes": "~{{minutes}}m {{seconds}}s left",
+      "hours": "~{{hours}}h {{minutes}}m left"
+    }
+  },
+  "folders": {
+    "title": "Where do your files live?",
+    "lead": "Pick the folders to search. You can change this later.",
+    "browse": "Browse for folder…",
+    "browseTitle": "Choose folders to search",
+    "pickMany": "pick as many as you like",
+    "pathPlaceholder": "Or type a path — ~ works, commas separate several",
+    "addFolder": "Add folder",
+    "pickerUnavailable": "Folder picker unavailable here — type a path below instead. ({{error}})"
+  },
+  "ocr": {
+    "title": "Read the text in your images",
+    "lead": "Screenshots, scans and photos become searchable. Pick an engine.",
+    "tesseractNote": "Fast, clean ASCII text; no download needed. Fallback engine.",
+    "ppocrNote": "Recommended. ~6 MB, highest recall on dense UI screenshots, fastest batch throughput.",
+    "indraNote": "~27 MB, 80+ languages, rotated/skewed scans; comparable recall, slightly slower.",
+    "notInstalled": "Not installed",
+    "notInBuild": "Not in this build",
+    "downloadFailed": "Download failed: {{error}}",
+    "verifying": "Verifying {{file}}…",
+    "downloadingPercent": "Downloading {{percent}}%",
+    "ready": "Ready",
+    "downloading": "Downloading",
+    "download": "Download"
+  },
+  "mode": {
+    "appTitle": "Open it like an app",
+    "launcherTitle": "Summon it from anywhere",
+    "appLead": "Kensaku opens as a normal window, stays in your taskbar, and keeps the index warm while it is open.",
+    "launcherLead": "Kensaku runs as an ultra-light background daemon. It opens with your shortcut, hides when you click away or press Esc, and stays in the tray.",
+    "label": "Window mode",
+    "aria": "Window mode",
+    "app": "Desktop app",
+    "launcher": "Launcher",
+    "appNote": "Closing the window quits Kensaku. Relaunch it from your app menu when you need it again.",
+    "launcherNote": "Closing the window hides it; Kensaku keeps running in the tray. You can switch modes later in Settings.",
+    "escHides": "Esc hides it again. Kensaku keeps running quietly.",
+    "pressShortcut": "Press a new shortcut…",
+    "change": "Change",
+    "escCancel": "Esc to cancel",
+    "wayland": "On Linux with Wayland, bind a system shortcut to kensaku --toggle if the key doesn't register.",
+    "closingLauncher": "Closing the window just hides Kensaku, it keeps running. If it seems to disappear, press your shortcut or look in the tray."
+  },
+  "footer": {
+    "folders_one": "{{count}} folder",
+    "folders_other": "{{count}} folders",
+    "staysLocal": "Everything stays on this computer.",
+    "downloadToContinue": "Download {{engine}} to continue.",
+    "back": "Back",
+    "continue": "Continue",
+    "startIndexing": "Start indexing"
+  },
+  "setupFailed": "Setup failed: {{error}}"
+}

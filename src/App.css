@@ -213,6 +213,16 @@
     caret-color: var(--ink);
   }
 
+  /* Native select popups are painted by the OS/WebView, not by the control,
+     so they ignore the inherited foreground. Without explicit colors the
+     dark theme's light text lands on a light popup (and vice versa) and the
+     choices become invisible. */
+  select option,
+  select optgroup {
+    background-color: var(--bg-elevated);
+    color: var(--fg);
+  }
+
   h1,
   h2,
   h3 {

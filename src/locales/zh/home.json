@@ -1,0 +1,12 @@
+{
+  "opened": "打开于 {{time}}",
+  "saved": "已保存",
+  "recent": "最近",
+  "emptyHint": "像向朋友描述一样，找到那个文件。",
+  "suggestions": {
+    "resume": "最新的简历",
+    "screenshots": "上周的截图",
+    "videos": "大视频",
+    "invoice": "发票"
+  }
+}

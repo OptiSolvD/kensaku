@@ -1,10 +1,11 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 
 /* Shared primitives for the Settings pages and elsewhere: 1px-bordered
    cards, field rows, switches, badges. Tokens only. */
 
 /** Tauri rejections are usually plain strings; extract a readable reason. */
-export function reasonFrom(err: unknown): string {
+export function reasonFrom(err: unknown, fallback = "unknown error"): string {
   if (typeof err === "string" && err) return err;
   if (err instanceof Error && err.message) return err.message;
   try {
@@ -13,7 +14,7 @@ export function reasonFrom(err: unknown): string {
   } catch {
     /* non-serializable — fall through */
   }
-  return "unknown error";
+  return fallback;
 }
 
 export function Field({
@@ -106,14 +107,15 @@ export function Stepper({
   step: number;
   onChange: (v: number) => void;
 }) {
+  const { t } = useTranslation("common");
   const clamp = (v: number) => Math.min(max, Math.max(min, v));
   return (
     <div className="flex h-8 items-center rounded-control bg-accent-soft shadow-[inset_0_0_0_1px_var(--border)]">
-      <button type="button" onClick={() => onChange(clamp(value - step))} className="flex h-full w-8 items-center justify-center text-muted transition-colors hover:text-fg" aria-label="Decrease">
+      <button type="button" onClick={() => onChange(clamp(value - step))} className="flex h-full w-8 items-center justify-center text-muted transition-colors hover:text-fg" aria-label={t("stepper.decrease")}>
         −
       </button>
       <span className="t-meta w-12 text-center text-fg">{value}</span>
-      <button type="button" onClick={() => onChange(clamp(value + step))} className="flex h-full w-8 items-center justify-center text-muted transition-colors hover:text-fg" aria-label="Increase">
+      <button type="button" onClick={() => onChange(clamp(value + step))} className="flex h-full w-8 items-center justify-center text-muted transition-colors hover:text-fg" aria-label={t("stepper.increase")}>
         +
       </button>
     </div>

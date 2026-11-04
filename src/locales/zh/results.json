@@ -1,0 +1,23 @@
+{
+  "hover": {
+    "folder": "文件夹"
+  },
+  "loadingMore": "正在加载更多",
+  "duplicates": {
+    "title": "重复项",
+    "subtitle": "内容完全相同以及高度相似的图片。仅供查看——请在文件管理器中删除。",
+    "close": "关闭",
+    "finding": "正在查找重复项…",
+    "none": "未发现重复项。",
+    "noneHint": "内容完全相同、连拍截图和视觉相似的重复项会显示在这里。",
+    "kindBurst": "连拍截图",
+    "kindExact": "内容相同",
+    "kindPerceptual": "相似图片",
+    "files": "{{count}} 个文件",
+    "openFile": "打开文件",
+    "copyPath": "复制路径",
+    "reveal": "在文件夹中显示",
+    "copied": "已复制",
+    "loadFailed": "无法检查重复项：{{error}}"
+  }
+}

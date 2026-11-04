@@ -28,20 +28,22 @@ fn existing(app: &AppHandle) -> Option<WebviewWindow> {
 }
 
 fn create(app: &AppHandle) -> tauri::Result<WebviewWindow> {
-    // In "app" mode the window is a normal application window: it shows in
-    // the dock/taskbar. In "launcher" mode (default) it stays off the
-    // taskbar so it behaves like a pop-up palette.
+    // In "app" mode the window is a normal application window: decorated,
+    // opaque, in the dock/taskbar, and not pinned above other windows. In
+    // "launcher" mode it stays frameless, off the taskbar, and floats like a
+    // palette. (`app_mode` itself defaults to launcher in the config so
+    // existing installs keep their behavior; Setup defaults new users to app.)
     let app_mode = crate::config::KensakuConfig::load().app_mode;
-    let skip_taskbar = app_mode != "app";
+    let launcher = app_mode != "app";
     let window = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("index.html".into()))
         .title("Kensaku")
         .inner_size(920.0, 640.0)
         .min_inner_size(720.0, 520.0)
-        .decorations(false)
-        .transparent(true)
-        .always_on_top(true)
-        .skip_taskbar(skip_taskbar)
-        .visible_on_all_workspaces(true)
+        .decorations(!launcher)
+        .transparent(launcher)
+        .always_on_top(launcher)
+        .skip_taskbar(launcher)
+        .visible_on_all_workspaces(launcher)
         .center()
         .shadow(true)
         .resizable(true)
@@ -50,11 +52,14 @@ fn create(app: &AppHandle) -> tauri::Result<WebviewWindow> {
 
     // Launcher mode: close hides the window and the app keeps running in the
     // tray. App mode: close exits the application like a normal desktop app.
+    // Read the mode inside the handler so a Settings change applies without
+    // recreating the window.
     let app_handle = app.clone();
-    let app_mode = crate::config::KensakuConfig::load().app_mode;
     window.on_window_event(move |event| {
         if let WindowEvent::CloseRequested { api, .. } = event {
+            let app_mode = crate::config::KensakuConfig::load().app_mode;
             if app_mode == "app" {
+                app_handle.exit(0);
                 return;
             }
             api.prevent_close();
@@ -64,6 +69,41 @@ fn create(app: &AppHandle) -> tauri::Result<WebviewWindow> {
     Ok(window)
 }
 
+/// Applies the parts of `app_mode` that can change on a live window. App mode
+/// gets native decorations (title bar, minimize/close) so it behaves like a
+/// normal desktop window; launcher mode stays frameless.
+pub fn apply_mode(window: &WebviewWindow, app_mode: &str) {
+    let launcher = app_mode != "app";
+    let _ = window.set_decorations(!launcher);
+    let _ = window.set_skip_taskbar(launcher);
+    let _ = window.set_always_on_top(launcher);
+    let _ = window.set_visible_on_all_workspaces(launcher);
+}
+
+/// Tells the user why the app has no window, even when release builds run
+/// without a console. The log path is included so a bug report is actionable.
+fn report_creation_failure(app: &AppHandle, error: &str) {
+    crate::crashlog::record_error("main window creation", error);
+    eprintln!("[Kensaku] could not create the window: {error}");
+
+    use tauri_plugin_dialog::DialogExt;
+    let hint = if cfg!(windows) {
+        "\n\nThis usually means the Microsoft Edge WebView2 runtime is missing or broken. Install it from Microsoft, then try again."
+    } else {
+        ""
+    };
+    // `blocking_show` must not run on the main thread, and this is called from
+    // `.setup` and tray handlers. `show` is non-blocking and posts the dialog
+    // to the platform's event loop.
+    app.dialog()
+        .message(format!(
+            "Kensaku could not open its window.\n\n{error}{hint}\n\nDetails were written to:\n{}",
+            crate::crashlog::path().display()
+        ))
+        .title("Kensaku could not start")
+        .show(|_| {});
+}
+
 /// Shows the search window, creating it if it was hidden (destroyed).
 pub fn show(app: &AppHandle) {
     let window = match existing(app) {
@@ -71,7 +111,7 @@ pub fn show(app: &AppHandle) {
         None => match create(app) {
             Ok(w) => w,
             Err(e) => {
-                eprintln!("[Kensaku] could not create the window: {e}");
+                report_creation_failure(app, &e.to_string());
                 return;
             }
         },
@@ -99,8 +139,13 @@ pub fn hide(app: &AppHandle) {
 }
 
 /// Shows the window if it is hidden, hides it if it is shown.
+///
+/// Desktop-app windows are never hidden by a toggle: the tray item, a stray
+/// `--toggle`, or a shortcut registered before a mode change should bring the
+/// window forward, not make a normal app vanish from the taskbar.
 pub fn toggle(app: &AppHandle) {
-    if existing(app).is_some_and(|w| w.is_visible().unwrap_or(false)) {
+    let visible = existing(app).is_some_and(|w| w.is_visible().unwrap_or(false));
+    if visible && crate::config::KensakuConfig::load().app_mode != "app" {
         hide(app);
     } else {
         show(app);

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { useTranslation } from "react-i18next";
 import {
   Check,
   ChevronDown,
@@ -16,8 +17,7 @@ import { Switch } from "./kit";
    reason, never left looking functional. The hint line height is always
    reserved so resolving the status never shifts the row. */
 
-const OCR_DESCRIPTION =
-  "Read text from screenshots, scans and photos. PP-OCRv6 is the default (best recall on dense UI, fastest batch); Indra OCR is the multilingual/rotated-scan option; Tesseract is the clean-text fallback where neither can run. Existing images are re-scanned after saving.";
+const OCR_DESCRIPTION_KEY = "ocr.description";
 
 /* Engines that run from a downloaded model pack inside Kensaku. */
 const PACKS = {
@@ -25,15 +25,13 @@ const PACKS = {
     name: "PP-OCRv6",
     statusCommand: "get_ocr_pack_status",
     downloadCommand: "download_ocr_pack",
-    blurb:
-      "About 6 MB · runs inside Kensaku · highest token recall on dense UI screenshots, fastest batch throughput; best default for screenshot search.",
+    blurbKey: "ocr.ppocrBlurb",
   },
   indra: {
     name: "Indra OCR",
     statusCommand: "get_indra_pack_status",
     downloadCommand: "download_indra_pack",
-    blurb:
-      "About 27 MB · runs inside Kensaku · 80+ languages, rotated/skewed scans and tilted pages; comparable recall to PP-OCR, slightly slower on simple images. Model weights under a modified OpenRAIL-M license.",
+    blurbKey: "ocr.indraBlurb",
   },
 } as const;
 
@@ -82,6 +80,7 @@ export function OcrField({
   config: KensakuConfig;
   setConfig: React.Dispatch<React.SetStateAction<KensakuConfig | null>>;
 }) {
+  const { t } = useTranslation("settings");
   /* null = status unknown (missing command or re-check pending) → the
      switch stays enabled, optimistic, with no hint line. */
   const [status, setStatus] = useState<OcrStatus | null>(null);
@@ -170,31 +169,33 @@ export function OcrField({
 
   const hint: React.ReactNode | null = usingPpocr ? (
     ppocrReady ? (
-      <span className="font-mono text-muted">{packInfo.name} ready · verified on a test image</span>
+      <span className="font-mono text-muted">
+        {t("ocr.readyVerified", { name: packInfo.name })}
+      </span>
     ) : downloading ? (
-      <span className="font-mono text-muted">Downloading {packInfo.name}…</span>
+      <span className="font-mono text-muted">{t("ocr.downloadingName", { name: packInfo.name })}</span>
     ) : status === null ? null : (
       <>
         <TriangleAlert className="h-3 w-3 shrink-0 text-warning" />
         <span className="text-warning">
-          {packProblem ?? `${packInfo.name} cannot run.`}
-          {fallbackEngine ? ` Using ${fallbackEngine} meanwhile.` : ""}
+          {packProblem ?? t("ocr.cannotRun", { name: packInfo.name })}
+          {fallbackEngine ? t("ocr.usingFallback", { engine: fallbackEngine }) : ""}
         </span>
       </>
     )
   ) : engineMissing ? (
     <>
       <TriangleAlert className="h-3 w-3 shrink-0 text-warning" />
-      <span className="text-warning">tesseract not found or not runnable.</span>
+      <span className="text-warning">{t("ocr.notFound")}</span>
     </>
   ) : noLanguages ? (
     <>
       <TriangleAlert className="h-3 w-3 shrink-0 text-warning" />
-      <span className="text-warning">OCR engine found, but no language data.</span>
+      <span className="text-warning">{t("ocr.noLanguages")}</span>
     </>
   ) : status?.available ? (
     <span className="font-mono text-muted">
-      Engine ready · languages: {status.languages.join(", ")}
+      {t("ocr.engineReady", { languages: status.languages.join(", ") })}
     </span>
   ) : null; /* unknown — slot reserved but empty */
 
@@ -202,8 +203,8 @@ export function OcrField({
     <div className={unavailable ? "border-b border-line px-4 py-3" : "px-4 py-3"}>
       <div className="flex items-center justify-between gap-6">
         <div className="min-w-0 space-y-0.5">
-          <p className="text-[12px] font-medium text-fg">OCR (images)</p>
-          <p className="text-[12px] leading-[18px] text-muted">{OCR_DESCRIPTION}</p>
+          <p className="text-[12px] font-medium text-fg">{t("ocr.title")}</p>
+          <p className="text-[12px] leading-[18px] text-muted">{t(OCR_DESCRIPTION_KEY)}</p>
           {/* Reserved line: same height whether or not a hint resolves into it. */}
           <p className="flex min-h-[18px] items-center gap-1.5 text-[11px] leading-[18px]">
             {hint}
@@ -218,11 +219,11 @@ export function OcrField({
 
       <div className="mt-3 flex items-center justify-between gap-4 border-t border-line pt-3">
         <div>
-          <p className="text-[11px] font-medium text-fg">OCR engine</p>
-          <p className="text-[12px] text-muted">Pick one. All read images; they are alternatives.</p>
+          <p className="text-[11px] font-medium text-fg">{t("ocr.engine")}</p>
+          <p className="text-[12px] text-muted">{t("ocr.engineDescription")}</p>
         </div>
         <select
-          aria-label="OCR engine"
+          aria-label={t("ocr.engineAria")}
           value={engine}
           onChange={(e) =>
             setConfig((c) =>
@@ -231,12 +232,12 @@ export function OcrField({
           }
           className="h-8 rounded-control border border-line bg-[var(--panel)] px-2 text-[11px] text-fg"
         >
-          <option value="tesseract">Tesseract (clean ASCII, separate install)</option>
+          <option value="tesseract">{t("ocr.tesseractOption")}</option>
           <option value="accurate" disabled={!status?.accurate_compiled}>
-            PP-OCRv6 (recommended · dense UI, fast)
+            {t("ocr.ppocrOption")}
           </option>
           <option value="indra" disabled={!status?.accurate_compiled}>
-            Indra OCR (multilingual, rotated scans)
+            {t("ocr.indraOption")}
           </option>
         </select>
       </div>
@@ -245,22 +246,26 @@ export function OcrField({
         <div className="mt-3 border-t border-line pt-3">
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
-              <p className="text-[11px] font-medium text-fg">{packInfo.name} pack</p>
-              <p className="text-[12px] leading-[18px] text-muted">{packInfo.blurb}</p>
+              <p className="text-[11px] font-medium text-fg">
+                {t("ocr.pack", { name: packInfo.name })}
+              </p>
+              <p className="text-[12px] leading-[18px] text-muted">{t(packInfo.blurbKey)}</p>
               <p className="mt-0.5 font-mono text-[11px] text-subtle">
                 {pack?.downloading
                   ? pack.progress?.phase === "verifying"
-                    ? `Verifying ${pack.progress.file}…`
-                    : `Downloading ${Math.round(
-                        ((pack.progress?.downloaded ?? 0) / Math.max(1, pack.progress?.total ?? 1)) * 100,
-                      )}%`
+                    ? t("ocr.verifying", { file: pack.progress.file })
+                    : t("ocr.downloadingPercent", {
+                        percent: Math.round(
+                          ((pack.progress?.downloaded ?? 0) / Math.max(1, pack.progress?.total ?? 1)) * 100,
+                        ),
+                      })
                   : pack?.ready
                     ? ppocrReady
-                      ? "Installed · verified"
-                      : packProblem ?? "Installed"
+                      ? t("ocr.installedVerified")
+                      : packProblem ?? t("ocr.installed")
                     : pack?.error
                       ? pack.error
-                      : "Not installed"}
+                      : t("ocr.notInstalled")}
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
@@ -274,7 +279,7 @@ export function OcrField({
                   <RefreshCw
                     className={`h-3 w-3 ${packBusy || pack?.downloading ? "animate-spin" : ""}`}
                   />
-                  Download
+                  {t("ocr.download")}
                 </button>
               )}
             </div>
@@ -303,7 +308,7 @@ export function OcrField({
       ) : (
         <div className="mt-3 border-t border-line pt-3">
           <p className="text-[12px] leading-[18px] text-muted">
-            {packInfo?.name} is not compiled into this build. Rebuild with default features to enable it.
+            {t("ocr.notCompiled", { name: packInfo?.name })}
           </p>
         </div>
       ))}
@@ -328,7 +333,7 @@ export function OcrField({
             </div>
             <button
               type="button"
-              title={`Copy install command — ${platform.command}`}
+              title={t("ocr.copyInstall", { command: platform.command })}
               onClick={() => copy(platform.command)}
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-control text-muted transition-colors hover:bg-elevated hover:text-fg"
             >
@@ -352,7 +357,7 @@ export function OcrField({
                   </code>
                   <button
                     type="button"
-                    title={`Copy install command — ${p.command}`}
+                    title={t("ocr.copyInstall", { command: p.command })}
                     onClick={() => copy(p.command)}
                     className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-subtle transition-colors hover:bg-accent-soft hover:text-fg"
                   >
@@ -379,7 +384,7 @@ export function OcrField({
                   allPlatforms ? "rotate-180" : ""
                 }`}
               />
-              Other platforms
+              {t("ocr.otherPlatforms")}
             </button>
             <button
               type="button"
@@ -391,7 +396,7 @@ export function OcrField({
                 className={`h-3 w-3 ${rechecking ? "animate-spin" : ""}`}
                 aria-hidden={rechecking}
               />
-              Re-check
+              {t("ocr.recheck")}
             </button>
           </div>
         </div>
@@ -404,8 +409,7 @@ export function OcrField({
             </p>
           )}
           <p className="text-[12px] leading-[18px] text-muted">
-            Language data is downloaded during setup. Use <b>About → Run setup again</b> to
-            acquire it, then re-check here.
+            {t("ocr.languageData")}
           </p>
           <button
             type="button"
@@ -414,7 +418,7 @@ export function OcrField({
             className="btn btn-secondary h-8 px-3 text-[12px]"
           >
             <RefreshCw className={`h-3 w-3 ${rechecking ? "animate-spin" : ""}`} aria-hidden={rechecking} />
-            Re-check
+            {t("ocr.recheck")}
           </button>
         </div>
       )}

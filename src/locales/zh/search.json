@@ -1,0 +1,157 @@
+{
+  "placeholder": "搜索文件、内容、含义…",
+  "command": "命令",
+  "clearInput": "清除 (Esc)",
+  "placeholderEmpty": "输入以搜索",
+  "placeholders": {
+    "everything": "搜索所有内容",
+    "invoice": "上周的发票",
+    "pdf": "type:pdf in:~/Projects",
+    "chart": "带图表的截图"
+  },
+  "resultCount": "{{count}} 条结果",
+  "resultCount_one": "{{count}} 条结果",
+  "resultCount_other": "{{count}} 条结果",
+  "modes": {
+    "ranked": "相关度",
+    "exhaustive": "穷举"
+  },
+  "sort": {
+    "best": "最佳匹配",
+    "newest": "最新",
+    "oldest": "最早",
+    "largest": "最大",
+    "name": "名称",
+    "label": "排序结果"
+  },
+  "view": {
+    "grid": "网格视图",
+    "list": "列表视图",
+    "layout": "布局",
+    "gridShort": "网格",
+    "listShort": "列表"
+  },
+  "saveSearch": "保存此搜索",
+  "saveName": "为此搜索命名",
+  "understoodAs": "理解为",
+  "removeInterpretation": "移除“{{source}}”",
+  "removeFilter": "移除筛选 {{filter}}",
+  "removeFilters": "清除筛选",
+  "tryPdf": "试试 type:pdf",
+  "onlyFolders": "只看文件夹",
+  "noResultsNothing": "还没有名为 {{query}} 的结果。",
+  "settingsTitle": "设置",
+  "toast": { "pathCopied": "已复制路径" },
+  "filters": {
+    "type": "类型",
+    "ext": "扩展名",
+    "in": "文件夹",
+    "modified": "修改时间",
+    "size": "大小",
+    "clear": "清除筛选",
+    "addFilter": "添加筛选"
+  },
+  "slashMenu": {
+    "search": "搜索",
+    "filter": "筛选",
+    "help": "帮助",
+    "settings": "设置",
+    "reindex": "重新索引",
+    "recent": "最近查询"
+  },
+  "slash": {
+    "images": "截图和照片",
+    "pdf": "PDF 文档",
+    "docs": "文档和笔记",
+    "code": "源代码和配置文件",
+    "media": "音频和视频",
+    "recent": "最近一周修改过",
+    "errors": "搜索错误信息",
+    "diagrams": "搜索图表",
+    "dupes": "查找重复的文件和图片",
+    "reindex": "重新扫描监视的文件夹",
+    "doctor": "索引健康报告",
+    "settings": "打开设置"
+  },
+  "contextMenu": {
+    "open": "打开",
+    "reveal": "在文件夹中显示",
+    "copyPath": "复制路径",
+    "copyName": "复制名称",
+    "details": "详情",
+    "preview": "预览",
+    "quickLook": "快速预览"
+  },
+  "empty": {
+    "noResults": "无结果",
+    "noResultsHint": "请尝试其他查询或放宽筛选条件。",
+    "noIndex": "尚未建立索引",
+    "noIndexHint": "在设置中选择文件夹以开始索引。"
+  },
+  "chips": {
+    "remove": "移除",
+    "excluded": "已排除。点击以清除",
+    "includeHint": "点击以包含，Alt+点击以排除"
+  },
+  "categories": {
+    "all": "全部",
+    "file": "文件",
+    "folder": "文件夹",
+    "image": "图片",
+    "doc": "文档",
+    "code": "代码",
+    "media": "媒体",
+    "archive": "压缩包",
+    "recent": "最近"
+  },
+  "interpretation": {
+    "sort": {
+      "newest": "排序：最新",
+      "oldest": "排序：最早",
+      "largest": "排序：最大"
+    },
+    "time": {
+      "today": "修改时间：今天",
+      "yesterday": "修改时间：昨天",
+      "last7Days": "修改时间：最近 7 天",
+      "last30Days": "修改时间：最近 30 天",
+      "lastYear": "修改时间：去年",
+      "lastWeekday": "修改时间：上个{{weekday}}",
+      "daysAgo": "修改时间：{{count}} 天前"
+    },
+    "weekday": {
+      "monday": "星期一",
+      "tuesday": "星期二",
+      "wednesday": "星期三",
+      "thursday": "星期四",
+      "friday": "星期五",
+      "saturday": "星期六",
+      "sunday": "星期日"
+    },
+    "sizeUnder": "大小：小于 {{value}}",
+    "sizeOver": "大小：大于 {{value}}",
+    "visual": "视觉搜索：图片",
+    "type": {
+      "images": "类型：图片",
+      "pdf": "类型：PDF",
+      "media": "类型：媒体",
+      "code": "类型：代码",
+      "documents": "类型：文档",
+      "folders": "类型：文件夹",
+      "archives": "类型：压缩包",
+      "logs": "类型：日志"
+    },
+    "in": "位置：{{place}}",
+    "place": {
+      "projects": "位置：项目",
+      "downloads": "位置：下载",
+      "documents": "位置：文档",
+      "desktop": "位置：桌面",
+      "pictures": "位置：图片",
+      "videos": "位置：视频",
+      "music": "位置：音乐",
+      "work": "位置：工作"
+    },
+    "alias": "别名：{{term}}"
+  }
+}

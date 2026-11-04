@@ -180,6 +180,7 @@ export interface KensakuConfig {
   ocr_engine?: OcrEngine;
   app_mode?: "launcher" | "app";
   theme?: "light" | "dark";
+  language?: string | null;
   aliases?: Alias[];
   saved_searches?: SavedSearch[];
   pins?: string[];

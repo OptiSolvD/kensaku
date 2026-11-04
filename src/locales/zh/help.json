@@ -1,0 +1,34 @@
+{
+  "title": "如何搜索",
+  "keyboard": "键盘",
+  "filters": "筛选",
+  "keys": {
+    "showHide": "显示或隐藏窗口（启动器模式）",
+    "moveResults": "进入结果列表并在其中移动",
+    "moveRow": "进入结果后，在同一行内移动",
+    "previewResults": "进入结果后预览",
+    "previewAnywhere": "在任意位置预览",
+    "openFile": "打开选中的文件",
+    "showFolder": "在文件夹中显示",
+    "copyPath": "复制选中项的路径（未选中文本时）",
+    "details": "查看选中文件的详情",
+    "settings": "设置",
+    "thisSheet": "打开本帮助",
+    "escape": "关闭对话框、清空搜索，然后隐藏（启动器模式）"
+  },
+  "filterDescriptions": {
+    "type": "按类别或扩展名",
+    "ext": "精确扩展名",
+    "in": "限定到某个文件夹",
+    "path": "路径包含指定文字",
+    "modified": "在 7 天内修改过（1h、30d、7d..30d）",
+    "size": "大小范围（kb、mb、gb）",
+    "aliases": "类别别名",
+    "lang": "扩展名对应的语言",
+    "name": "仅匹配文件名",
+    "content": "仅匹配文件内容",
+    "regex": "正则表达式",
+    "time": "自然语言时间筛选",
+    "near": "相距 5 个词以内的词语"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "title": "详情",
+  "location": "位置",
+  "size": "大小",
+  "modified": "修改时间",
+  "matchedBy": "匹配方式",
+  "score": "得分",
+  "done": "完成",
+  "match": {
+    "fileName": "文件名",
+    "content": "文件内容",
+    "contentFolded": "内容（模糊）",
+    "semantic": "语义",
+    "both": "文件名和内容"
+  },
+  "preview": {
+    "title": "预览",
+    "open": "打开",
+    "loading": "正在加载预览…",
+    "unavailable": "此文件类型无法预览",
+    "close": "关闭"
+  }
+}

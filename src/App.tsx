@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import {
@@ -32,8 +33,10 @@ import { ResultControls } from "./components/ResultControls";
 import { VirtualGrid } from "./components/VirtualGrid";
 import { FileRow } from "./components/FileRow";
 import { normalizeTheme } from "./hooks/useTheme";
+import { useLanguage } from "./hooks/useLanguage";
 import { PreviewDialog } from "./components/PreviewDialog";
 import { classify } from "./lib/categories";
+import { interpretationLabel } from "./lib/interpretation";
 import { inFilter } from "./lib/query";
 import { isNewerVersion } from "./lib/version";
 import { getVersion } from "@tauri-apps/api/app";
@@ -71,6 +74,12 @@ function putSnippet(
 }
 
 function App() {
+  const { t } = useTranslation("search");
+  const { t: tc } = useTranslation("common");
+  const { t: te } = useTranslation("errors");
+  /* Apply the persisted/auto language once at the root. Settings has its own
+     picker; this keeps startup and every later window in the same language. */
+  useLanguage();
   const [isSetupComplete, setIsSetupComplete] = useState<boolean | null>(null);
   const [query, setQuery] = useState("");
 
@@ -118,7 +127,10 @@ function App() {
     invoke<KensakuConfig>("get_config")
       .then(setConfig)
       .catch(() => undefined);
-  }, [showSettings]);
+    // Reload after setup too: the wizard saves the chosen window mode, and a
+    // stale launcher-mode snapshot would make app mode hide on the first open
+    // or Escape press.
+  }, [showSettings, isSetupComplete]);
   /* The backend config is the durable copy of the theme — localStorage does
      not survive the launcher destroying its webview on hide. Re-apply the
      persisted pick on every (re)mount so close/open keeps the chosen finish. */
@@ -517,23 +529,28 @@ function App() {
 
   /* ---------------- actions ---------------- */
 
+  // Launcher mode gets out of the way once a file opens; a desktop-app window
+  // stays where it is, like any other app. Until the config arrives, do not
+  // hide: an app-mode window must never be mistaken for a launcher.
+  const hideAfterOpen = config ? config.app_mode !== "app" : false;
+
   const handleOpenFile = useCallback(async (path: string) => {
     try {
       await invoke("open_file", { path });
-      await invoke("hide_window");
+      if (hideAfterOpen) await invoke("hide_window");
     } catch (err) {
       console.error("Open file error:", err);
     }
-  }, []);
+  }, [hideAfterOpen]);
 
   const handleOpenFolder = useCallback(async (path: string) => {
     try {
       await invoke("open_folder", { path });
-      await invoke("hide_window");
+      if (hideAfterOpen) await invoke("hide_window");
     } catch (err) {
       console.error("Open folder error:", err);
     }
-  }, []);
+  }, [hideAfterOpen]);
 
   const handleRunCommand = useCallback(async (cmdStr: string) => {
     try {
@@ -613,11 +630,11 @@ function App() {
   const handleCopyPath = useCallback(
     (path: string) => {
       navigator.clipboard.writeText(path).then(
-        () => flash("Path copied"),
-        () => flash("Couldn't copy the path"),
+        () => flash(t("toast.pathCopied")),
+        () => flash(te("copyPath")),
       );
     },
-    [flash],
+    [flash, t, te],
   );
 
 
@@ -629,20 +646,20 @@ function App() {
       inputRef.current?.focus();
     };
     return [
-      { id: "images", name: "images", label: "type:image", description: "Screenshots and photos", icon: ImageIcon, run: () => focus("type:image ") },
-      { id: "pdf", name: "pdf", label: "ext:pdf", description: "PDF documents", icon: FileText, run: () => focus("ext:pdf ") },
-      { id: "docs", name: "docs", label: "type:doc", description: "Documents and notes", icon: FileText, run: () => focus("type:doc ") },
-      { id: "code", name: "code", label: "type:code", description: "Source and config files", icon: FileCode, run: () => focus("type:code ") },
-      { id: "media", name: "media", label: "type:media", description: "Audio and video", icon: Film, run: () => focus("type:media ") },
-      { id: "recent", name: "recent", label: "modified:<7d", description: "Changed in the last week", icon: Clock, run: () => focus("modified:<7d ") },
-      { id: "errors", name: "errors", label: "error", description: "Search for error text", icon: TriangleAlert, run: () => focus("error ") },
-      { id: "diagrams", name: "diagrams", label: "diagram", description: "Search for diagrams", icon: FileCode, run: () => focus("diagram ") },
-      { id: "dupes", name: "dupes", label: "review", description: "Find duplicate files and images", icon: Copy, run: () => { setQuery(""); setShowDuplicates(true); } },
-      { id: "reindex", name: "reindex", label: "action", description: "Re-scan watched folders", icon: RefreshCw, run: () => { setQuery(""); handleRunCommand("/reindex"); } },
-      { id: "doctor", name: "doctor", label: "action", description: "Index health report", icon: Stethoscope, run: () => { setQuery(""); handleRunCommand("/doctor"); } },
-      { id: "settings", name: "settings", label: "⌘,", description: "Open Settings", icon: SettingsIcon, run: () => { setQuery(""); openSettings(); } },
+      { id: "images", name: "images", label: "type:image", description: t("slash.images"), icon: ImageIcon, run: () => focus("type:image ") },
+      { id: "pdf", name: "pdf", label: "ext:pdf", description: t("slash.pdf"), icon: FileText, run: () => focus("ext:pdf ") },
+      { id: "docs", name: "docs", label: "type:doc", description: t("slash.docs"), icon: FileText, run: () => focus("type:doc ") },
+      { id: "code", name: "code", label: "type:code", description: t("slash.code"), icon: FileCode, run: () => focus("type:code ") },
+      { id: "media", name: "media", label: "type:media", description: t("slash.media"), icon: Film, run: () => focus("type:media ") },
+      { id: "recent", name: "recent", label: "modified:<7d", description: t("slash.recent"), icon: Clock, run: () => focus("modified:<7d ") },
+      { id: "errors", name: "errors", label: "error", description: t("slash.errors"), icon: TriangleAlert, run: () => focus("error ") },
+      { id: "diagrams", name: "diagrams", label: "diagram", description: t("slash.diagrams"), icon: FileCode, run: () => focus("diagram ") },
+      { id: "dupes", name: "dupes", label: "review", description: t("slash.dupes"), icon: Copy, run: () => { setQuery(""); setShowDuplicates(true); } },
+      { id: "reindex", name: "reindex", label: "action", description: t("slash.reindex"), icon: RefreshCw, run: () => { setQuery(""); handleRunCommand("/reindex"); } },
+      { id: "doctor", name: "doctor", label: "action", description: t("slash.doctor"), icon: Stethoscope, run: () => { setQuery(""); handleRunCommand("/doctor"); } },
+      { id: "settings", name: "settings", label: "⌘,", description: t("slash.settings"), icon: SettingsIcon, run: () => { setQuery(""); openSettings(); } },
     ];
-  }, [handleRunCommand, openSettings]);
+  }, [handleRunCommand, openSettings, t]);
 
   const trimmedQuery = query.trim();
   const slashFilter = trimmedQuery.startsWith("/") ? trimmedQuery.slice(1).trim().toLowerCase() : null;
@@ -957,7 +974,9 @@ function App() {
         inputRef.current?.focus();
         return;
       }
-      if (config?.app_mode === "app") return;
+      // Only hide once the mode is known and it is a launcher; an app-mode
+      // window keeps its content when the user presses Escape.
+      if (!config || config.app_mode === "app") return;
       e.preventDefault();
       invoke("hide_window").catch(() => undefined);
     };
@@ -972,7 +991,9 @@ function App() {
   useEffect(() => {
     const onBlur = () => {
       if (isSetupComplete !== true) return;
-      if (config?.app_mode === "app") return;
+      // The config may not have arrived yet on a fresh window; never treat an
+      // app-mode window as a launcher in that gap.
+      if (!config || config.app_mode === "app") return;
       if (showSettings || showDuplicates || showHelp || preview || details || saveOpen || menu) return;
       invoke("hide_window").catch(() => undefined);
     };
@@ -1014,11 +1035,11 @@ function App() {
               y={menu.y}
               onClose={() => setMenu(null)}
               items={[
-                { label: "Open", onSelect: () => handleOpenFile(menu.result.path) },
-                { label: "Preview", onSelect: () => setPreview(menu.result) },
-                { label: "Show in folder", onSelect: () => handleOpenFolder(menu.result.path) },
-                { label: "Copy path", onSelect: () => handleCopyPath(menu.result.path) },
-                { label: "Details", onSelect: () => setDetails(menu.result), separatorBefore: true },
+                { label: t("contextMenu.open"), onSelect: () => handleOpenFile(menu.result.path) },
+                { label: t("contextMenu.preview"), onSelect: () => setPreview(menu.result) },
+                { label: t("contextMenu.reveal"), onSelect: () => handleOpenFolder(menu.result.path) },
+                { label: t("contextMenu.copyPath"), onSelect: () => handleCopyPath(menu.result.path) },
+                { label: t("contextMenu.details"), onSelect: () => setDetails(menu.result), separatorBefore: true },
               ] as ContextMenuItem[]}
             />
           )}
@@ -1059,7 +1080,7 @@ function App() {
                 trailing={
                   <button
                     type="button"
-                    title="Settings"
+                    title={t("settingsTitle")}
                     onClick={() => openSettings()}
                     className="btn btn-ghost btn-icon h-9 w-9"
                   >
@@ -1078,12 +1099,12 @@ function App() {
 
               {!isCommandMode && interpretation.length > 0 && (
                 <div className="flex shrink-0 flex-wrap items-center gap-1.5 px-3.5 pb-1.5">
-                  <span className="t-meta mr-1 text-subtle">Understood as</span>
+                  <span className="t-meta mr-1 text-subtle">{t("understoodAs")}</span>
                   {interpretation.map((c, i) => (
                     <button
                       key={`${c.raw}-${i}`}
                       type="button"
-                      title={`Remove “${c.source}”`}
+                      title={t("removeInterpretation", { source: c.source })}
                       onClick={() =>
                         setQuery((prev) =>
                           prev.replace(c.source, "").replace(/\s+/g, " ").trim(),
@@ -1091,7 +1112,7 @@ function App() {
                       }
                       className="group flex h-6 items-center gap-1.5 rounded-full bg-accent-soft px-2.5 text-[12px] text-fg shadow-[inset_0_0_0_1px_var(--border)] transition-colors hover:text-danger"
                     >
-                      {c.label}
+                      {interpretationLabel(c, t)}
                       <X className="h-2.5 w-2.5 opacity-50 group-hover:opacity-100" />
                     </button>
                   ))}
@@ -1129,7 +1150,7 @@ function App() {
                   <input
                     autoFocus
                     value={saveName}
-                    placeholder="Name this search"
+                    placeholder={t("saveName")}
                     onChange={(e) => setSaveName(e.target.value)}
                     onKeyDown={async (e) => {
                       if (e.key !== "Enter") return;
@@ -1172,7 +1193,7 @@ function App() {
                     }}
                     className="btn btn-primary h-8"
                   >
-                    Save
+                    {tc("actions.save")}
                   </button>
                 </div>
               )}
@@ -1262,21 +1283,21 @@ function App() {
                   ) : hasQuery ? (noResults ? (
                     <div className="flex h-full flex-col items-start justify-end gap-4 px-4 pb-8 select-none">
                       <p className="t-moment rise-in max-w-lg text-muted">
-                        Nothing called <span className="text-fg">{query.trim()}</span>, yet.
+                        {t("noResultsNothing", { query: query.trim() })}
                       </p>
                       <div className="flex flex-wrap items-center gap-1.5">
                         {hasActiveFilters(query) && (
-                          <SuggestChip label="Remove filters" onClick={() => setQuery("")} />
+                          <SuggestChip label={t("removeFilters")} onClick={() => setQuery("")} />
                         )}
                         <SuggestChip
-                          label="Try type:pdf"
+                          label={t("tryPdf")}
                           onClick={() => {
                             setQuery("type:pdf");
                             inputRef.current?.focus();
                           }}
                         />
                         <SuggestChip
-                          label="Nothing but folders"
+                          label={t("onlyFolders")}
                           onClick={() => {
                             setQuery("type:dir");
                             inputRef.current?.focus();

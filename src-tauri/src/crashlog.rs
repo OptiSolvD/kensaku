@@ -185,6 +185,14 @@ pub fn record_error(context: &str, err: &str) {
     record_error_at(&path(), context, err);
 }
 
+/// Records a non-fatal startup/progress milestone.
+pub fn info(message: &str) {
+    append_line(
+        &path(),
+        &format!("[{}] INFO {}\n", now_unix_secs(), message),
+    );
+}
+
 fn record_error_at(path: &Path, context: &str, err: &str) {
     append_line(
         path,

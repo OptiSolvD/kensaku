@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { HighlightedName } from "./EmptyState";
 import { isThumbImage, useThumbnail } from "../lib/thumbnails";
 import { displayParent, formatBytes, formatRelativeTime } from "../lib/format";
@@ -35,6 +36,7 @@ export const FileRow = React.memo(function FileRow({
   onContextMenu?: (x: number, y: number) => void;
 }) {
   const eligible = showThumbs && !item.is_dir && isThumbImage(item.filename);
+  const { t } = useTranslation("common");
   const { src, failed } = useThumbnail(item.path, eligible);
   const thumb = eligible && src && !failed ? src : null;
   const ext = extOf(item.filename, item.is_dir);
@@ -80,7 +82,7 @@ export const FileRow = React.memo(function FileRow({
       <span className="t-meta w-16 shrink-0 text-right text-subtle">
         {item.is_dir ? "—" : formatBytes(item.file_size)}
       </span>
-      <span className="t-meta w-16 shrink-0 text-right text-subtle">{formatRelativeTime(item.modified)}</span>
+      <span className="t-meta w-16 shrink-0 text-right text-subtle">{formatRelativeTime(item.modified, t)}</span>
     </div>
   );
 });

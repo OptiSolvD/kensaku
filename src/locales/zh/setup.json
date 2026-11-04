@@ -1,0 +1,95 @@
+{
+  "minimize": "最小化",
+  "theme": "主题",
+  "readyMark": "就绪",
+  "indexingMark": "索引中",
+  "brand": {
+    "found": "找到了。",
+    "search": "搜索。"
+  },
+  "done": {
+    "title": "你的文件已就绪。",
+    "pressShortcut": "在任意位置按下 <kbd>{{shortcut}}</kbd> 即可搜索。",
+    "openFromTaskbar": "Kensaku 已在任务栏或程序坞中。需要时从那里打开即可。",
+    "closingNote": "关闭窗口只会隐藏 Kensaku，它仍会在后台运行。如果它似乎消失了，请按快捷键或查看托盘。",
+    "quitNote": "关闭窗口将退出 Kensaku。索引仍保存在磁盘上，下次启动即可立即使用。",
+    "files": "文件",
+    "readInside": "已读取内容",
+    "start": "开始搜索"
+  },
+  "scan": {
+    "phases": {
+      "verifying": "正在校验文件",
+      "walking": "正在查找文件",
+      "extracting": "正在读取文档内容",
+      "embedding": "正在理解语义",
+      "committing": "正在保存索引",
+      "paused": "已暂停",
+      "idle": "即将完成",
+      "starting": "正在启动"
+    },
+    "ofFiles": "共 {{total}} 个文件",
+    "filesSoFar": "个文件（截至目前）",
+    "finishing": "即将完成",
+    "estimating": "正在估算",
+    "onlyFirstTime": "仅首次需要。之后每次启动都是即时的。",
+    "eta": {
+      "seconds": "约 {{seconds}} 秒",
+      "minutes": "约 {{minutes}} 分 {{seconds}} 秒",
+      "hours": "约 {{hours}} 小时 {{minutes}} 分"
+    }
+  },
+  "folders": {
+    "title": "你的文件在哪里？",
+    "lead": "选择要搜索的文件夹。之后可以随时更改。",
+    "browse": "浏览文件夹…",
+    "browseTitle": "选择要搜索的文件夹",
+    "pickMany": "可多选",
+    "pathPlaceholder": "或输入路径——支持 ~，多个路径用逗号分隔",
+    "addFolder": "添加文件夹",
+    "pickerUnavailable": "此环境无法使用文件夹选择器——请在下方输入路径。（{{error}}）"
+  },
+  "ocr": {
+    "title": "读取图片中的文字",
+    "lead": "截图、扫描件和照片也能被搜索。请选择一个引擎。",
+    "tesseractNote": "快速、纯 ASCII 文本；无需下载。后备引擎。",
+    "ppocrNote": "推荐。约 6 MB，密集界面截图识别率最高，批量吞吐最快。",
+    "indraNote": "约 27 MB，支持 80 多种语言、旋转/倾斜扫描；识别率相当，稍慢。",
+    "notInstalled": "未安装",
+    "notInBuild": "此版本不包含",
+    "downloadFailed": "下载失败：{{error}}",
+    "verifying": "正在校验 {{file}}…",
+    "downloadingPercent": "正在下载 {{percent}}%",
+    "ready": "就绪",
+    "downloading": "正在下载",
+    "download": "下载"
+  },
+  "mode": {
+    "appTitle": "像应用一样打开",
+    "launcherTitle": "随处唤起",
+    "appLead": "Kensaku 会以普通窗口打开，留在任务栏中，并在打开期间保持索引热态。",
+    "launcherLead": "Kensaku 作为超轻量后台守护进程运行。按快捷键打开，点击别处或按 Esc 时隐藏，并常驻托盘。",
+    "label": "窗口模式",
+    "aria": "窗口模式",
+    "app": "桌面应用",
+    "launcher": "启动器",
+    "appNote": "关闭窗口即退出 Kensaku。需要时请从应用菜单重新启动。",
+    "launcherNote": "关闭窗口只会隐藏它；Kensaku 会继续在托盘中运行。之后可在设置中切换模式。",
+    "escHides": "按 Esc 会再次隐藏。Kensaku 会继续安静运行。",
+    "pressShortcut": "请按下新的快捷键…",
+    "change": "更改",
+    "escCancel": "Esc 取消",
+    "wayland": "在 Linux Wayland 下，如果快捷键无法注册，可将系统快捷键绑定到 kensaku --toggle。",
+    "closingLauncher": "关闭窗口只会隐藏 Kensaku，它仍会继续运行。如果它似乎消失了，请按快捷键或查看托盘。"
+  },
+  "footer": {
+    "folders_one": "{{count}} 个文件夹",
+    "folders_other": "{{count}} 个文件夹",
+    "staysLocal": "所有内容都留在本机。",
+    "downloadToContinue": "下载 {{engine}} 以继续。",
+    "back": "返回",
+    "continue": "继续",
+    "startIndexing": "开始索引"
+  },
+  "setupFailed": "设置失败：{{error}}"
+}

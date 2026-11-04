@@ -206,6 +206,13 @@ pub fn run() {
     // captured too. It only touches the config directory path; it never loads
     // or mutates the config.
     crashlog::install_panic_hook();
+    crashlog::info(&format!(
+        "starting {} {} ({} {})",
+        env!("CARGO_PKG_NAME"),
+        env!("CARGO_PKG_VERSION"),
+        std::env::consts::OS,
+        std::env::consts::ARCH
+    ));
 
     commands::init_process_start();
 
@@ -234,6 +241,10 @@ pub fn run() {
     }
 
     let config = KensakuConfig::load();
+    crashlog::info(&format!(
+        "config loaded: setup_complete={} app_mode={} ocr_enabled={} engine={}",
+        config.is_setup_complete, config.app_mode, config.ocr_enabled, config.ocr_engine
+    ));
     indexer::extract::set_ocr_enabled(config.ocr_enabled);
     indexer::extract::image::set_ocr_max_image_bytes(config.ocr_max_image_bytes);
     indexer::extract::set_content_caps(config.content_max_file_size_mb, config.content_max_text_bytes);
@@ -269,6 +280,9 @@ pub fn run() {
     // re-queues already-indexed images.
 
     let is_setup = config.is_setup_complete;
+    // Desktop-app mode launches with its window visible; launcher mode starts
+    // in the tray. Pending first-run setup always needs UI.
+    let open_window_on_start = !is_setup || config.app_mode == "app";
 
     let (indexer_manager, daemon_client) = if daemon_available {
         (
@@ -351,6 +365,7 @@ pub fn run() {
             commands::get_config,
             commands::save_config,
             commands::is_setup_complete,
+            commands::apply_window_mode,
             commands::is_setup_configured,
             commands::run_setup_again,
             commands::complete_setup,
@@ -450,13 +465,12 @@ pub fn run() {
 
             let _ = tray_builder.build(app);
 
-            // 3. Start in the background: tray, watcher and indexer only, no
-            // window. The window is created by the first toggle (Alt+Space,
-            // tray click), and hide/destroy frees it again (main_window.rs).
-            // Only a pending first-run setup needs UI right away.
-            if is_setup {
-                // Stay hidden; nothing to create yet.
-            } else {
+            // 3. Launcher mode starts in the background (tray, watcher and
+            // indexer only); the window is created by the first toggle
+            // (Alt+Space, tray click). Desktop-app mode is an ordinary app:
+            // show its window on launch. A pending first-run setup always
+            // needs UI right away.
+            if open_window_on_start {
                 main_window::show(app.handle());
             }
 
