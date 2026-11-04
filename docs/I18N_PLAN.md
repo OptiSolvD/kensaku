@@ -52,15 +52,15 @@ src/
     ja/ ...              # future, empty until translated
 ```
 
-Tauri's `public/` is not used; strings are bundled via Vite dynamic imports.
+Tauri's `public/` is not used; strings are bundled by Vite from `src/locales/`.
 
 ## Config & settings (mirror the `theme` pattern)
 
 - Rust: add `language: Option<String>` to `KensakuConfig` in `src-tauri/src/config.rs`, default `None` (auto-detect), with `normalize_language()` and a v6→v7 migration (like `normalize_theme`).
 - TS: add `language?: string` to `KensakuConfig` in `src/types.ts`.
-- Hook: `src/hooks/useLanguage.ts` — reads config, applies to i18next, persists on change (localStorage + `save_config`), same shape as `useTheme.ts`.
+- Hook: `src/hooks/useLanguage.ts` — reads the stored/config choice, applies it to i18next, and mirrors the picker to localStorage so the UI switches instantly; Settings persists it to `config.language` on Save.
 - UI: a dropdown in `Settings → General` (next to theme). Options: "Auto (system)", "English", "中文", … driven by `supportedLngs`.
-- `index.html`: set `<html lang>` dynamically on language change.
+- `useLanguage` sets `document.documentElement.lang` whenever the language changes.
 
 ## Crowdin workflow (community translations)
 
@@ -73,14 +73,14 @@ Tauri's `public/` is not used; strings are bundled via Vite dynamic imports.
 
 ## Phases
 
-### Phase 1 — Infra (1–2 days)
+### Phase 1 — Infra (shipped)
 - Install/config i18next, create `src/i18n/*`, empty `en/*.json` + `zh/*.json`.
 - Add `language` to Rust config + TS types + normalizer + migration.
 - `useLanguage` hook + settings dropdown.
 - `index.html` `lang` binding.
 - **Deliverable:** language switcher works; everything still English (fallback). CI green.
 
-### Phase 2 — Core search UI in Chinese (2–4 days)
+### Phase 2 — Core search UI in Chinese (shipped)
 Translate these namespaces fully to zh:
 - `common` (buttons, toasts, units)
 - `search` (search bar, slash menu, context menu, filters, chips)
@@ -90,10 +90,10 @@ Translate these namespaces fully to zh:
 - `help` (help dialog)
 Wire `t()` into: `App.tsx`, `HomeView`, `SearchBar`, `EmptyState`, `ResultControls`, `ResultItem`, `FilterChips`, `CategoryChips`, `KeyHintStrip`, `HelpDialog`, `DetailsDialog`, `ContextMenu`.
 
-### Phase 3 — Heavy modals (3–5 days)
+### Phase 3 — Heavy modals (shipped)
 - `settings` + `setup` namespaces → translate `SettingsModal.tsx` (~62 KB) and `SetupModal.tsx` (~35 KB). These are the bulk of the strings; do them as a dedicated PR.
 
-### Phase 4 — Backend + extras (optional)
+### Phase 4 — Backend + extras (partly shipped: surfaced error strings; Crowdin pending)
 - Map backend error codes to translated strings in the UI.
 - Crowdin onboarding + first community language (Japanese likely first given CJK overlap).
 - `Intl` formatting audit.

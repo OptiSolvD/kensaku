@@ -139,8 +139,13 @@ pub fn hide(app: &AppHandle) {
 }
 
 /// Shows the window if it is hidden, hides it if it is shown.
+///
+/// Desktop-app windows are never hidden by a toggle: the tray item, a stray
+/// `--toggle`, or a shortcut registered before a mode change should bring the
+/// window forward, not make a normal app vanish from the taskbar.
 pub fn toggle(app: &AppHandle) {
-    if existing(app).is_some_and(|w| w.is_visible().unwrap_or(false)) {
+    let visible = existing(app).is_some_and(|w| w.is_visible().unwrap_or(false));
+    if visible && crate::config::KensakuConfig::load().app_mode != "app" {
         hide(app);
     } else {
         show(app);
