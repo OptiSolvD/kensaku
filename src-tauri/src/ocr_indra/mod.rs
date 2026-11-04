@@ -168,7 +168,7 @@ mod pool {
 
     fn load() -> Option<Vec<Mutex<Engine>>> {
         let cores = std::thread::available_parallelism().map_or(2, |n| n.get());
-        let count = (cores / 2 / THREADS).clamp(1, 3);
+        let count = (cores / 2 / THREADS).clamp(1, 4);
         // `ort` can panic instead of erroring when the runtime is broken.
         let loaded = std::panic::catch_unwind(|| {
             // One ONNX Runtime environment per process: share PP-OCR's.
@@ -195,13 +195,21 @@ mod pool {
     pub fn read(page: &Gray) -> Option<Result<String, String>> {
         let engines = ENGINES.get_or_init(load).as_ref()?;
         let start = NEXT.fetch_add(1, Ordering::Relaxed);
-        let free = (0..engines.len())
-            .find_map(|i| engines[(start + i) % engines.len()].try_lock().ok());
-        let mut engine = match free {
-            Some(guard) => guard,
-            None => engines[start % engines.len()]
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner()),
+        let mut attempts = 0;
+        let mut engine = loop {
+            let offset = (start + attempts) % engines.len();
+            if let Some(guard) = (0..engines.len())
+                .find_map(|i| engines[(offset + i) % engines.len()].try_lock().ok())
+            {
+                break guard;
+            }
+            attempts += 1;
+            if attempts > 300 {
+                break engines[start % engines.len()]
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
         };
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| engine.read(page)));
         Some(result.unwrap_or_else(|_| Err("the engine panicked".into())))

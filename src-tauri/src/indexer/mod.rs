@@ -860,7 +860,7 @@ impl IndexerManager {
                         };
 
                         let done = extract_done.fetch_add(1, Ordering::Relaxed) + 1;
-                        if done.is_multiple_of(25) || done == extract_total {
+                        if done.is_multiple_of(5) || done == extract_total {
                             let mut st = producer_status.write();
                             st.extract_done = done;
                             st.current_status =

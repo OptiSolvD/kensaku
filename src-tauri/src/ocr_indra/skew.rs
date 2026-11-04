@@ -3,7 +3,7 @@
 //! that levels the text rows.
 
 use super::imageops::{Gray, resize};
-use rayon::prelude::*;
+
 
 /// Degrees of tilt searched (quarter turns cover the rest).
 const DESKEW_MAX: f64 = 45.0;
@@ -20,7 +20,7 @@ pub fn rotate(gray: &Gray, degrees: f64, replicate: bool) -> Gray {
     let (wm, hm) = (gray.w as i64 - 1, gray.h as i64 - 1);
     let mut out = Gray::new(gray.w, gray.h, 0);
     out.data
-        .par_chunks_mut(gray.w)
+        .chunks_mut(gray.w)
         .enumerate()
         .for_each(|(y, row)| {
             let dy = y as f64 - cy;
@@ -69,7 +69,7 @@ fn row_sharpness(ink: &Gray, degrees: f64) -> f64 {
 
 /// Best angle of `angles` (the first one on ties, like `max`).
 fn best(ink: &Gray, angles: &[f64]) -> f64 {
-    let scores: Vec<f64> = angles.par_iter().map(|&a| row_sharpness(ink, a)).collect();
+    let scores: Vec<f64> = angles.iter().map(|&a| row_sharpness(ink, a)).collect();
     let mut at = 0;
     for (i, &s) in scores.iter().enumerate() {
         if s > scores[at] {
@@ -96,7 +96,7 @@ pub fn estimate_skew(gray: &Gray) -> f64 {
     }
     let coarse = ink_thumb(gray, SIDE / 2);
     let grid = steps(-DESKEW_MAX, DESKEW_MAX, 2.0);
-    let scores: Vec<f64> = grid.par_iter().map(|&a| row_sharpness(&coarse, a)).collect();
+    let scores: Vec<f64> = grid.iter().map(|&a| row_sharpness(&coarse, a)).collect();
     let mut ranked: Vec<usize> = (0..grid.len()).collect();
     ranked.sort_by(|&a, &b| scores[a].total_cmp(&scores[b]));
     let mut starts = vec![0.0];

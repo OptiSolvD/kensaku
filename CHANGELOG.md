@@ -3,6 +3,25 @@
 All notable changes to Kensaku. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning: [SemVer](https://semver.org/).
 
+## [1.0.15] — 2026-11-04
+
+### Fixed
+- **Indra OCR crawl stall & lock contention**: Resolved an indexing freeze that could
+  stall crawls at 97%+ when processing large batches of images with Indra OCR.
+  - Eliminated high-frequency `EmptyWorkingSet` memory trims on Windows that were acquiring
+    the kernel virtual memory manager lock after every single extracted file, rate-limiting
+    them to at most once every 5 seconds.
+  - Replaced the serialized mutex-guarded channel receiver in `SlotPool` with a condition
+    variable (`Condvar`) and permit count, preventing caller thread starvation during backpressure.
+  - Replaced the blocking lock convoy across parallel Indra OCR engines with non-blocking
+    `try_lock()` polling and adaptive thread yields, ensuring idle engines are immediately utilized.
+  - Increased single-file OCR extraction timeout budget from 8 s to 45 s for images and scanned
+    PDFs, avoiding spurious timeouts and orphaned tasks on dense high-resolution screenshots.
+  - Replaced parallel slice operations in skew detection with sequential row processing,
+    eliminating nested thread pool overhead on preview thumbnails.
+  - Reduced indexing progress update interval from every 25 files to every 5 files, providing
+    smooth and responsive UI progress feedback during compute-heavy document processing.
+
 ## [1.0.14] — 2026-11-04
 
 ### Added

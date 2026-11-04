@@ -3538,7 +3538,7 @@ dependencies = [
 
 [[package]]
 name = "kensaku"
-version = "1.0.14"
+version = "1.0.15"
 dependencies = [
  "auto-launch",
  "base64 0.22.1",

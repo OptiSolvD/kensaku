@@ -12,9 +12,9 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Condvar, Mutex};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// Process-wide OCR setting, mirroring [`crate::config::KensakuConfig::ocr_enabled`].
 ///
@@ -272,16 +272,13 @@ pub fn insert_cached_document(path: &Path, document: DocumentExtract) {
     cache.insert(key, document);
 }
 
-/// Upper bound for a single document extraction. A malformed PDF (or a stalled
-/// network/FUSE filesystem) must not block indexing forever.
-const EXTRACTION_TIMEOUT: Duration = Duration::from_secs(8);
-
-/// Wall-clock budget for extracting a single file. Scales with file size so
-/// large documents (books, manuals) are not stuck pending forever, while
-/// small files keep the snappy default. Capped at 120 s.
-fn extraction_timeout_for(file_size: u64) -> Duration {
+/// Upper bound for a single document extraction. Plain documents use a snappy
+/// 15 s timeout; OCR candidates (images and PDFs) get 45 s to account for
+/// deep neural net inference queues and complex screenshot recognition.
+fn extraction_timeout_for(file_size: u64, is_ocr_candidate: bool) -> Duration {
+    let base = if is_ocr_candidate { 45 } else { 15 };
     let extra = file_size / (5 * 1024 * 1024) * 2;
-    let secs = (EXTRACTION_TIMEOUT.as_secs() + extra).min(120);
+    let secs = (base + extra).min(120);
     Duration::from_secs(secs)
 }
 
@@ -300,27 +297,19 @@ fn extraction_concurrency() -> usize {
 
 /// Bounded slot pool paired with the extraction thread pool.
 ///
-/// A timeout cannot cancel work that has already started (a tesseract process
-/// or a parser loop keeps running). Without a permit, every timed-out file
-/// would queue another detached task while callers kept timing out behind an
-/// ever-growing backlog — which is exactly what made image-heavy crawls
-/// collapse into hundreds of spurious 8-second timeouts. A permit is held by
-/// the task itself and returned when it genuinely finishes, so at most
-/// `extraction_concurrency()` extractions are ever detached.
+/// Implemented via a condition variable and atomic counting to eliminate
+/// mutex-held receiver serialization: multiple callers can wait simultaneously
+/// without starving each other, and freed slots wake waiting callers immediately.
 struct SlotPool {
-    available: Mutex<std::sync::mpsc::Receiver<()>>,
-    release: std::sync::mpsc::SyncSender<()>,
+    available: Mutex<usize>,
+    cvar: Condvar,
 }
 
 impl SlotPool {
     fn new(slots: usize) -> Self {
-        let (release, available) = std::sync::mpsc::sync_channel(slots);
-        for _ in 0..slots {
-            release.send(()).expect("slot pool has capacity");
-        }
         Self {
-            available: Mutex::new(available),
-            release,
+            available: Mutex::new(slots),
+            cvar: Condvar::new(),
         }
     }
 
@@ -329,11 +318,21 @@ impl SlotPool {
     }
 
     fn acquire_timeout(&'static self, timeout: Duration) -> Option<ExtractionSlot> {
-        // The receiver is behind a mutex because `Receiver` is not `Sync`. A
-        // waiting caller holds it while blocked, which is fine: it only becomes
-        // contended when the pool is saturated, and at that point callers are
-        // meant to queue for backpressure anyway.
-        self.available.lock().ok()?.recv_timeout(timeout).ok()?;
+        let mut available = self.available.lock().ok()?;
+        let start = Instant::now();
+        while *available == 0 {
+            let elapsed = start.elapsed();
+            if elapsed >= timeout {
+                return None;
+            }
+            let remaining = timeout - elapsed;
+            let (next, wait_res) = self.cvar.wait_timeout(available, remaining).ok()?;
+            available = next;
+            if wait_res.timed_out() && *available == 0 {
+                return None;
+            }
+        }
+        *available -= 1;
         Some(ExtractionSlot { pool: self })
     }
 }
@@ -344,8 +343,10 @@ struct ExtractionSlot {
 
 impl Drop for ExtractionSlot {
     fn drop(&mut self) {
-        // If the receiver is gone the process is shutting down.
-        let _ = self.pool.release.try_send(());
+        if let Ok(mut count) = self.pool.available.lock() {
+            *count += 1;
+            self.pool.cvar.notify_one();
+        }
     }
 }
 
@@ -496,6 +497,8 @@ fn extract_document_tracked(
 
     let capped_bytes = (max_bytes as usize).min(content_max_text_bytes());
     let format = sniff_format(path);
+    let is_ocr = format == DocumentFormat::Image || format == DocumentFormat::Pdf;
+    let timeout = extraction_timeout_for(file_size, is_ocr);
 
     // Run the extraction on the dedicated pool and time it out. On timeout the
     // file stays pending (or skipped) and is retried on a later crawl; nothing
@@ -537,10 +540,10 @@ fn extract_document_tracked(
                 let _ = tx.send(result);
             });
 
-            match rx.recv_timeout(extraction_timeout_for(file_size)) {
+            match rx.recv_timeout(timeout) {
                 Ok(result) => result,
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
-                    warn_extraction_timeout(path, extraction_timeout_for(file_size));
+                    warn_extraction_timeout(path, timeout);
                     retry.store(true, Ordering::SeqCst);
                     None
                 }

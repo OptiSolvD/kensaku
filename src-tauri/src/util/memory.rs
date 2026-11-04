@@ -28,15 +28,29 @@ pub fn release_memory() {
 
 #[cfg(windows)]
 pub fn release_memory() {
-    // `EmptyWorkingSet` trims the process working set; `GetCurrentProcess`
-    // returns a pseudo-handle that does not need closing.
-    #[link(name = "psapi")]
-    unsafe extern "system" {
-        fn EmptyWorkingSet(h_process: *mut core::ffi::c_void) -> i32;
-        fn GetCurrentProcess() -> *mut core::ffi::c_void;
-    }
-    unsafe {
-        let _ = EmptyWorkingSet(GetCurrentProcess());
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    static LAST_RELEASE: AtomicU64 = AtomicU64::new(0);
+
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let last = LAST_RELEASE.load(Ordering::Relaxed);
+    if now >= last + 5
+        && LAST_RELEASE
+            .compare_exchange(last, now, Ordering::Relaxed, Ordering::Relaxed)
+            .is_ok()
+    {
+        #[link(name = "psapi")]
+        unsafe extern "system" {
+            fn EmptyWorkingSet(h_process: *mut core::ffi::c_void) -> i32;
+            fn GetCurrentProcess() -> *mut core::ffi::c_void;
+        }
+        unsafe {
+            let _ = EmptyWorkingSet(GetCurrentProcess());
+        }
     }
 }
 
