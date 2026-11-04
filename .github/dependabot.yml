@@ -1,0 +1,21 @@
+# github.com/yjid/kensaku
+#
+# The `glib` crate sits in the lockfile at 0.18 via Tauri 2's GTK 0.18 stack.
+# A security advisory marks glib >= 0.15.0, < 0.20.0 as affected, so GitHub
+# keeps launching security updates for it and every run fails with
+# `security_update_not_possible` (earliest fixed version is 0.20.0, which
+# cargo cannot resolve next to tauri/gtk 0.18). Ignore it until the tauri
+# crate stack moves to gtk 0.20+; dismiss the advisory in the Security tab
+# as "no fix available".
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /src-tauri
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: glib
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
