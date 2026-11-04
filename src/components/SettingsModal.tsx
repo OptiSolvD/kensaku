@@ -28,6 +28,7 @@ import { useTheme } from "../hooks/useTheme";
 import { useLanguage } from "../hooks/useLanguage";
 import { useStats } from "../hooks/useStats";
 import { Card, Field, Switch, Stepper, SectionHeader, reasonFrom } from "./settings/kit";
+import { WindowModePicker } from "./WindowModePicker";
 import { OcrField } from "./settings/ocr";
 import { StatsForNerds } from "./settings/stats";
 import { DoctorSection } from "./settings/doctor";
@@ -397,25 +398,25 @@ function GeneralSection({
       </Card>
 
       <Card title={t("window.title")}>
-        <Field label={t("window.mode")} description={t("window.description")}>
-          <div role="radiogroup" aria-label={t("window.aria")} className="pill-group">
-            {(["app", "launcher"] as const).map((mode) => {
-              const active = (config.app_mode ?? "launcher") === mode;
-              return (
-                <button
-                  key={mode}
-                  type="button"
-                  role="radio"
-                  aria-checked={active}
-                  onClick={() => setConfig((c) => (c ? { ...c, app_mode: mode } : c))}
-                  className="pill"
-                >
-                  {mode === "app" ? t("window.app") : t("window.launcher")}
-                </button>
-              );
-            })}
+        <div className="space-y-3 px-4 py-3.5">
+          <div className="space-y-0.5">
+            <p className="text-[13px] font-medium text-fg">{t("window.mode")}</p>
+            <p className="text-[12px] leading-[18px] text-muted">{t("window.description")}</p>
           </div>
-        </Field>
+          <WindowModePicker
+            compact
+            value={config.app_mode === "app" ? "app" : "launcher"}
+            onChange={(mode) => setConfig((c) => (c ? { ...c, app_mode: mode } : c))}
+            shortcut={config.shortcut}
+            labels={{
+              app: t("window.app"),
+              launcher: t("window.launcher"),
+              appDescription: t("window.appCard"),
+              launcherDescription: t("window.launcherCard"),
+              ariaLabel: t("window.aria"),
+            }}
+          />
+        </div>
       </Card>
 
       <Card title={t("invocation.title")}>

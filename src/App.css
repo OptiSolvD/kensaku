@@ -63,6 +63,10 @@
   --success: #248a3d;
   --scrim: rgba(0, 0, 0, 0.2);
   --icon-tint-opacity: 0.12;
+  /* macOS-style window controls, used by the window-mode previews. */
+  --traffic-close: #ff5f57;
+  --traffic-minimize: #febc2e;
+  --traffic-zoom: #28c840;
 }
 
 [data-theme="dark"],
@@ -99,6 +103,10 @@
   --success: #30d158;
   --scrim: rgba(0, 0, 0, 0.55);
   --icon-tint-opacity: 0.14;
+  /* macOS-style window controls — same vivid hues in both themes. */
+  --traffic-close: #ff5f57;
+  --traffic-minimize: #febc2e;
+  --traffic-zoom: #28c840;
 }
 
 @theme inline {

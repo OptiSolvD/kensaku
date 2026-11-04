@@ -6,6 +6,7 @@ import { useTranslation, Trans } from "react-i18next";
 import type { TFunction } from "i18next";
 import { Check, Plus, ArrowRight, ArrowLeft, LoaderCircle, Sun, Moon, Download, X, FolderOpen, Minus } from "lucide-react";
 import { useTheme } from "../hooks/useTheme";
+import { WindowModePicker } from "./WindowModePicker";
 import type { IndexingStatus, KensakuConfig, OcrEngine, OcrStatus, ModelsStatus } from "../types";
 
 /* First run: three screens, one decision each.
@@ -73,10 +74,8 @@ export function SetupModal({ onSetupCompleted }: { onSetupCompleted: () => void 
   const [selectedOcrEngine, setSelectedOcrEngine] = useState<OcrEngine | null>(null);
   const [packError, setPackError] = useState<string | null>(null);
   const [shortcut, setShortcut] = useState("Alt+Space");
-  // New installs open as a regular desktop app: people who expect a window
-  // shouldn't have to discover the launcher model first. Launcher mode stays
-  // one click away, here and in Settings.
-  const [appMode, setAppMode] = useState<"app" | "launcher">("app");
+  // New installs default to launcher mode: one shortcut away, always.
+  const [appMode, setAppMode] = useState<"app" | "launcher">("launcher");
   /* Set once the user picks a mode, so the config lookup below cannot
      overwrite a click that races the invoke. */
   const appModeTouched = useRef(false);
@@ -639,45 +638,33 @@ export function SetupModal({ onSetupCompleted }: { onSetupCompleted: () => void 
       )}
 
       {step === 2 && (
-        <div key="s2" className="section-enter flex min-h-0 flex-1 flex-col gap-8 overflow-y-auto pt-2">
+        <div key="s2" className="section-enter flex min-h-0 flex-1 flex-col gap-7 overflow-y-auto pt-2">
           <div className="space-y-2">
-            <h1 className="t-title text-fg">
-              {appMode === "app" ? t("mode.appTitle") : t("mode.launcherTitle")}
-            </h1>
-            <p className="t-lead text-muted">
-              {appMode === "app" ? t("mode.appLead") : t("mode.launcherLead")}
-            </p>
+            <h1 className="t-title text-fg">{t("mode.title")}</h1>
+            <p className="t-lead text-muted">{t("mode.lead")}</p>
           </div>
 
-          <div className="space-y-2">
-            <p className="t-meta text-subtle">{t("mode.label")}</p>
-            <div role="radiogroup" aria-label={t("mode.aria")} className="pill-group w-full">
-              {(["app", "launcher"] as const).map((mode) => {
-                const active = appMode === mode;
-                return (
-                  <button
-                    key={mode}
-                    type="button"
-                    role="radio"
-                    aria-checked={active}
-                    onClick={() => chooseAppMode(mode)}
-                    className="pill flex-1"
-                  >
-                    {mode === "app" ? t("mode.app") : t("mode.launcher")}
-                  </button>
-                );
-              })}
-            </div>
-            <p className="text-[12px] text-subtle">
+          <div className="space-y-3">
+            <WindowModePicker
+              value={appMode}
+              onChange={chooseAppMode}
+              shortcut={shortcut}
+              labels={{
+                app: t("mode.app"),
+                launcher: t("mode.launcher"),
+                appDescription: t("mode.appCard"),
+                launcherDescription: t("mode.launcherCard"),
+                ariaLabel: t("mode.aria"),
+              }}
+            />
+            <p className="px-1 text-[12px] leading-[18px] text-subtle">
               {appMode === "app" ? t("mode.appNote") : t("mode.launcherNote")}
             </p>
           </div>
 
           {appMode === "launcher" && (
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <p className="text-[13px] text-muted">{t("mode.escHides")}</p>
-              </div>
+            <div className="space-y-3">
+              <p className="text-[12px] text-muted">{t("mode.escHides")}</p>
               <button
                 type="button"
                 onClick={() => setCapturing(true)}
@@ -698,12 +685,6 @@ export function SetupModal({ onSetupCompleted }: { onSetupCompleted: () => void 
                 {t("mode.wayland")}
               </p>
             </div>
-          )}
-
-          {appMode === "launcher" && (
-            <p className="text-[13px] font-medium leading-[18px] text-blue">
-              {t("mode.closingLauncher")}
-            </p>
           )}
         </div>
       )}

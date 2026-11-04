@@ -8,11 +8,11 @@
     "search": "to search."
   },
   "done": {
-    "title": "Your files are ready.",
-    "pressShortcut": "Press <kbd>{{shortcut}}</kbd> from anywhere to search.",
-    "openFromTaskbar": "Kensaku is in your taskbar or Dock. Open it from there whenever you need it.",
-    "closingNote": "Closing the window just hides Kensaku, it keeps running in the background. If it seems to disappear, press your shortcut or look in the tray.",
-    "quitNote": "Closing the window quits Kensaku. Your index stays on disk, so the next launch is instant.",
+    "title": "You're ready to search.",
+    "pressShortcut": "Press <kbd>{{shortcut}}</kbd> anywhere to open Kensaku.",
+    "openFromTaskbar": "Find Kensaku in your taskbar or Dock anytime.",
+    "closingNote": "Esc or clicking outside hides the window — Kensaku keeps running in the tray.",
+    "quitNote": "Closing the window quits Kensaku. Your index is saved, next launch is instant.",
     "files": "Files",
     "readInside": "Read inside",
     "start": "Start searching"
@@ -65,22 +65,22 @@
     "download": "Download"
   },
   "mode": {
-    "appTitle": "Open it like an app",
-    "launcherTitle": "Summon it from anywhere",
-    "appLead": "Kensaku opens as a normal window, stays in your taskbar, and keeps the index warm while it is open.",
-    "launcherLead": "Kensaku runs as an ultra-light background daemon. It opens with your shortcut, hides when you click away or press Esc, and stays in the tray.",
-    "label": "Window mode",
+    "title": "How should Kensaku open?",
+    "lead": "You can change this anytime in Settings.",
     "aria": "Window mode",
-    "app": "Desktop app",
+    "app": "Window",
     "launcher": "Launcher",
-    "appNote": "Closing the window quits Kensaku. Relaunch it from your app menu when you need it again.",
-    "launcherNote": "Closing the window hides it; Kensaku keeps running in the tray. You can switch modes later in Settings.",
-    "escHides": "Esc hides it again. Kensaku keeps running quietly.",
+    "default": "Default",
+    "appCard": "Normal window in your taskbar. Closing it quits Kensaku.",
+    "launcherCard": "Press a shortcut to open. Esc or click outside to hide. Lives in the tray.",
+    "appNote": "Closing the window quits Kensaku.",
+    "launcherNote": "Closing hides it — Kensaku stays in the tray.",
+    "escHides": "Open shortcut",
     "pressShortcut": "Press a new shortcut…",
     "change": "Change",
     "escCancel": "Esc to cancel",
-    "wayland": "On Linux with Wayland, bind a system shortcut to kensaku --toggle if the key doesn't register.",
-    "closingLauncher": "Closing the window just hides Kensaku, it keeps running. If it seems to disappear, press your shortcut or look in the tray."
+    "wayland": "On Wayland, bind kensaku --toggle as a system shortcut if the key doesn't register.",
+    "closingLauncher": "Esc or click outside to hide. Find it again in the tray or with your shortcut."
   },
   "footer": {
     "folders_one": "{{count}} folder",

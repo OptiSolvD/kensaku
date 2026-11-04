@@ -71,10 +71,12 @@
   "window": {
     "title": "窗口",
     "mode": "模式",
-    "description": "桌面应用会留在任务栏中，关闭窗口即退出。启动器在按 Esc 或点击别处时隐藏，并继续在托盘中运行。",
-    "app": "应用",
+    "description": "窗口模式在关闭时退出 Kensaku。启动器按 Esc 或点击外部时隐藏，常驻托盘。",
+    "app": "窗口",
     "launcher": "启动器",
-    "aria": "窗口模式"
+    "aria": "窗口模式",
+    "appCard": "任务栏或程序坞中的普通窗口。关闭即退出 Kensaku。",
+    "launcherCard": "用快捷键唤起的浮动面板。关闭后隐藏到托盘。"
   },
   "invocation": {
     "title": "唤起方式",

@@ -71,10 +71,12 @@
   "window": {
     "title": "Window",
     "mode": "Mode",
-    "description": "Desktop app stays in the taskbar and quits when you close it. Launcher hides on Esc or when you click away, and keeps running in the tray.",
-    "app": "App",
+    "description": "Window mode quits on close. Launcher hides on Esc or click outside, and keeps running in the tray.",
+    "app": "Window",
     "launcher": "Launcher",
-    "aria": "Window mode"
+    "aria": "Window mode",
+    "appCard": "Normal window in the taskbar or Dock. Closing quits Kensaku.",
+    "launcherCard": "Floating palette summoned by a shortcut. Closing hides it to the tray."
   },
   "invocation": {
     "title": "Invocation",
@@ -212,14 +214,14 @@
     "howTo": "How to use Kensaku",
     "howToIntro": "A few simple tricks make search feel instant:",
     "tipLabels": {
-    "tab": "Tab",
-    "aliases": "Aliases",
-    "filters": "Filters",
-    "sort": "Sort",
-    "pin": "Pin",
-    "ocr": "OCR"
-  },
-  "tipTab": "shows or hides the details pane next to results.",
+      "tab": "Tab",
+      "aliases": "Aliases",
+      "filters": "Filters",
+      "sort": "Sort",
+      "pin": "Pin",
+      "ocr": "OCR"
+    },
+    "tipTab": "shows or hides the details pane next to results.",
     "tipAliases": "let a word like “resume” also find “cv” and “curriculum”.",
     "tipFilters": "such as {{type}}, {{ext}}, {{in}} and {{modified}} narrow results.",
     "tipSlash": "opens the command menu for quick actions like {{dupes}}, {{doctor}} and {{settings}}.",

@@ -8,11 +8,11 @@
     "search": "搜索。"
   },
   "done": {
-    "title": "你的文件已就绪。",
-    "pressShortcut": "在任意位置按下 <kbd>{{shortcut}}</kbd> 即可搜索。",
-    "openFromTaskbar": "Kensaku 已在任务栏或程序坞中。需要时从那里打开即可。",
-    "closingNote": "关闭窗口只会隐藏 Kensaku，它仍会在后台运行。如果它似乎消失了，请按快捷键或查看托盘。",
-    "quitNote": "关闭窗口将退出 Kensaku。索引仍保存在磁盘上，下次启动即可立即使用。",
+    "title": "已准备好搜索。",
+    "pressShortcut": "在任意位置按下 <kbd>{{shortcut}}</kbd> 即可打开 Kensaku。",
+    "openFromTaskbar": "随时可以在任务栏或程序坞中找到 Kensaku。",
+    "closingNote": "按 Esc 或点击窗口外部可隐藏——Kensaku 在托盘中持续运行。",
+    "quitNote": "关闭窗口将退出 Kensaku。索引已保存，下次启动即时可用。",
     "files": "文件",
     "readInside": "已读取内容",
     "start": "开始搜索"
@@ -65,22 +65,22 @@
     "download": "下载"
   },
   "mode": {
-    "appTitle": "像应用一样打开",
-    "launcherTitle": "随处唤起",
-    "appLead": "Kensaku 会以普通窗口打开，留在任务栏中，并在打开期间保持索引热态。",
-    "launcherLead": "Kensaku 作为超轻量后台守护进程运行。按快捷键打开，点击别处或按 Esc 时隐藏，并常驻托盘。",
-    "label": "窗口模式",
+    "title": "Kensaku 该如何打开？",
+    "lead": "随时可在设置中更改。",
     "aria": "窗口模式",
-    "app": "桌面应用",
+    "app": "窗口",
     "launcher": "启动器",
-    "appNote": "关闭窗口即退出 Kensaku。需要时请从应用菜单重新启动。",
-    "launcherNote": "关闭窗口只会隐藏它；Kensaku 会继续在托盘中运行。之后可在设置中切换模式。",
-    "escHides": "按 Esc 会再次隐藏。Kensaku 会继续安静运行。",
+    "default": "默认",
+    "appCard": "任务栏中的普通窗口。关闭即退出 Kensaku。",
+    "launcherCard": "按快捷键打开。按 Esc 或点击窗口外部隐藏。常驻托盘。",
+    "appNote": "关闭窗口即退出 Kensaku。",
+    "launcherNote": "关闭后隐藏——Kensaku 留在托盘中运行。",
+    "escHides": "唤起快捷键",
     "pressShortcut": "请按下新的快捷键…",
     "change": "更改",
     "escCancel": "Esc 取消",
-    "wayland": "在 Linux Wayland 下，如果快捷键无法注册，可将系统快捷键绑定到 kensaku --toggle。",
-    "closingLauncher": "关闭窗口只会隐藏 Kensaku，它仍会继续运行。如果它似乎消失了，请按快捷键或查看托盘。"
+    "wayland": "在 Wayland 下，如果快捷键无法注册，可将 kensaku --toggle 绑定为系统快捷键。",
+    "closingLauncher": "按 Esc 或点击窗口外部可隐藏。通过快捷键或托盘再次打开。"
   },
   "footer": {
     "folders_one": "{{count}} 个文件夹",
