@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { SearchResult } from "../types";
 import { HighlightedName } from "./EmptyState";
 import { isThumbImage, useThumbnail } from "../lib/thumbnails";
@@ -29,13 +30,14 @@ interface ResultItemProps {
 
 export const ResultItem = React.memo<ResultItemProps>(
   ({ result, query, index, isSelected, onSelect, onOpen, onContextMenu, showThumbs }) => {
+    const { t } = useTranslation("common");
     const imageEligible = Boolean(showThumbs) && !result.is_dir && isThumbImage(result.filename);
     const { src: thumbSrc, failed: thumbFailed } = useThumbnail(result.path, imageEligible);
     const hasThumb = Boolean(thumbSrc) && !thumbFailed;
 
     const meta = result.is_dir
-      ? `Folder · ${formatRelativeTime(result.modified)}`
-      : `${formatBytes(result.file_size)} · ${formatRelativeTime(result.modified)}`;
+      ? `${t("units.folder")} · ${formatRelativeTime(result.modified, t)}`
+      : `${formatBytes(result.file_size)} · ${formatRelativeTime(result.modified, t)}`;
 
     return (
       <button
@@ -91,6 +93,9 @@ export const ResultItem = React.memo<ResultItemProps>(
     prev.result.snippet === next.result.snippet &&
     prev.result.match_type === next.result.match_type &&
     prev.result.group_count === next.result.group_count &&
+    prev.result.file_size === next.result.file_size &&
+    prev.result.modified === next.result.modified &&
+    prev.result.is_dir === next.result.is_dir &&
     prev.isSelected === next.isSelected &&
     prev.query === next.query &&
     prev.index === next.index &&

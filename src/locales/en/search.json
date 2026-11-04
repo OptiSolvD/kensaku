@@ -92,5 +92,66 @@
     "remove": "Remove",
     "excluded": "Excluded. Click to clear",
     "includeHint": "Click to include, Alt-click to exclude"
+  },
+  "categories": {
+    "all": "All",
+    "file": "Files",
+    "folder": "Folders",
+    "image": "Images",
+    "doc": "Docs",
+    "code": "Code",
+    "media": "Media",
+    "archive": "Archives",
+    "recent": "Recent"
+  },
+  "interpretation": {
+    "sort": {
+      "newest": "Sort: newest",
+      "oldest": "Sort: oldest",
+      "largest": "Sort: largest"
+    },
+    "time": {
+      "today": "Modified: today",
+      "yesterday": "Modified: yesterday",
+      "last7Days": "Modified: last 7 days",
+      "last30Days": "Modified: last 30 days",
+      "lastYear": "Modified: last year",
+      "lastWeekday": "Modified: last {{weekday}}",
+      "daysAgo": "Modified: {{count}} days ago"
+    },
+    "weekday": {
+      "monday": "Monday",
+      "tuesday": "Tuesday",
+      "wednesday": "Wednesday",
+      "thursday": "Thursday",
+      "friday": "Friday",
+      "saturday": "Saturday",
+      "sunday": "Sunday"
+    },
+    "sizeUnder": "Size: under {{value}}",
+    "sizeOver": "Size: over {{value}}",
+    "visual": "Visual: images",
+    "type": {
+      "images": "Type: images",
+      "pdf": "Type: PDF",
+      "media": "Type: media",
+      "code": "Type: code",
+      "documents": "Type: documents",
+      "folders": "Type: folders",
+      "archives": "Type: archives",
+      "logs": "Type: logs"
+    },
+    "in": "In: {{place}}",
+    "place": {
+      "projects": "In: Projects",
+      "downloads": "In: Downloads",
+      "documents": "In: Documents",
+      "desktop": "In: Desktop",
+      "pictures": "In: Pictures",
+      "videos": "In: Videos",
+      "music": "In: Music",
+      "work": "In: Work"
+    },
+    "alias": "Alias: {{term}}"
   }
 }

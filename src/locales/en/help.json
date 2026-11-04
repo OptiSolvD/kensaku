@@ -3,7 +3,7 @@
   "keyboard": "Keyboard",
   "filters": "Filters",
   "keys": {
-    "showHide": "show or hide the window",
+    "showHide": "show or hide the window (launcher mode)",
     "moveResults": "move into and through results",
     "moveRow": "move within a row, once you're in the results",
     "previewResults": "preview, once you're in the results",
@@ -14,7 +14,7 @@
     "details": "details for selected file",
     "settings": "settings",
     "thisSheet": "this sheet",
-    "escape": "close dialog, clear search, then hide"
+    "escape": "close dialog, clear search, then hide (launcher mode)"
   },
   "filterDescriptions": {
     "type": "category or extension",

@@ -3,7 +3,7 @@
   "keyboard": "键盘",
   "filters": "筛选",
   "keys": {
-    "showHide": "显示或隐藏窗口",
+    "showHide": "显示或隐藏窗口（启动器模式）",
     "moveResults": "进入结果列表并在其中移动",
     "moveRow": "进入结果后，在同一行内移动",
     "previewResults": "进入结果后预览",
@@ -14,7 +14,7 @@
     "details": "查看选中文件的详情",
     "settings": "设置",
     "thisSheet": "打开本帮助",
-    "escape": "关闭对话框、清空搜索，然后隐藏"
+    "escape": "关闭对话框、清空搜索，然后隐藏（启动器模式）"
   },
   "filterDescriptions": {
     "type": "按类别或扩展名",

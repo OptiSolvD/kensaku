@@ -5,10 +5,20 @@
 
 ## The window
 
-Press <kbd>Alt</kbd>+<kbd>Space</kbd> (configurable in Settings) to toggle the
-floating search window. It hides on close, when it loses focus (clicking away),
-and keeps the index warm. It stays out of the taskbar/dock and appears on every
-workspace, like a launcher.
+Kensaku has two window modes, chosen during setup and switchable in
+**Settings → Window**:
+
+- **Desktop app** (the setup default) — a normal window with a title bar, in
+  your taskbar/dock. Closing it quits Kensaku. Best if you treat it like any
+  other app.
+- **Launcher** — press <kbd>Alt</kbd>+<kbd>Space</kbd> (configurable in
+  Settings) to toggle a floating search window. It hides on close, when it
+  loses focus (clicking away), or on <kbd>Esc</kbd>, keeps the index warm in
+  the tray, stays out of the taskbar/dock, and appears on every workspace.
+
+Either mode works from the same index. In launcher mode the global shortcut is
+registered; in desktop app mode it is not, because the window is already in the
+taskbar.
 
 The main page is intentionally just **search + category chips + files**. Every
 statistic and setting lives in Settings, so the search surface stays quiet.
@@ -27,7 +37,7 @@ Every action has a key. Keys work from the search box unless noted.
 
 | Key | Action |
 |---|---|
-| <kbd>Alt</kbd>+<kbd>Space</kbd> | show or hide the window (set this in Settings) |
+| <kbd>Alt</kbd>+<kbd>Space</kbd> | show or hide the window (launcher mode; set this in Settings) |
 | <kbd>/</kbd> | focus search, or open the command menu |
 | <kbd>↑</kbd> <kbd>↓</kbd> | move selection (grid: by row) |
 | <kbd>←</kbd> <kbd>→</kbd> | move within a grid row |
@@ -37,7 +47,7 @@ Every action has a key. Keys work from the search box unless noted.
 | <kbd>⌘</kbd>/<kbd>Ctrl</kbd>+<kbd>C</kbd> | copy the selected path (outside the search box) |
 | <kbd>⌘</kbd>/<kbd>Ctrl</kbd>+<kbd>I</kbd> | details for the selected file |
 | <kbd>⌘,</kbd>/<kbd>Ctrl</kbd>+<kbd>,</kbd> | settings |
-| <kbd>Esc</kbd> | close a dialog, clear the search, then hide |
+| <kbd>Esc</kbd> | close a dialog, clear the search, then (launcher mode) hide |
 
 On Linux, set a shortcut for `kensaku --toggle` in your desktop settings. See [INSTALL.md](INSTALL.md#set-a-quick-shortcut).
 

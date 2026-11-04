@@ -92,5 +92,66 @@
     "remove": "移除",
     "excluded": "已排除。点击以清除",
     "includeHint": "点击以包含，Alt+点击以排除"
+  },
+  "categories": {
+    "all": "全部",
+    "file": "文件",
+    "folder": "文件夹",
+    "image": "图片",
+    "doc": "文档",
+    "code": "代码",
+    "media": "媒体",
+    "archive": "压缩包",
+    "recent": "最近"
+  },
+  "interpretation": {
+    "sort": {
+      "newest": "排序：最新",
+      "oldest": "排序：最早",
+      "largest": "排序：最大"
+    },
+    "time": {
+      "today": "修改时间：今天",
+      "yesterday": "修改时间：昨天",
+      "last7Days": "修改时间：最近 7 天",
+      "last30Days": "修改时间：最近 30 天",
+      "lastYear": "修改时间：去年",
+      "lastWeekday": "修改时间：上个{{weekday}}",
+      "daysAgo": "修改时间：{{count}} 天前"
+    },
+    "weekday": {
+      "monday": "星期一",
+      "tuesday": "星期二",
+      "wednesday": "星期三",
+      "thursday": "星期四",
+      "friday": "星期五",
+      "saturday": "星期六",
+      "sunday": "星期日"
+    },
+    "sizeUnder": "大小：小于 {{value}}",
+    "sizeOver": "大小：大于 {{value}}",
+    "visual": "视觉搜索：图片",
+    "type": {
+      "images": "类型：图片",
+      "pdf": "类型：PDF",
+      "media": "类型：媒体",
+      "code": "类型：代码",
+      "documents": "类型：文档",
+      "folders": "类型：文件夹",
+      "archives": "类型：压缩包",
+      "logs": "类型：日志"
+    },
+    "in": "位置：{{place}}",
+    "place": {
+      "projects": "位置：项目",
+      "downloads": "位置：下载",
+      "documents": "位置：文档",
+      "desktop": "位置：桌面",
+      "pictures": "位置：图片",
+      "videos": "位置：视频",
+      "music": "位置：音乐",
+      "work": "位置：工作"
+    },
+    "alias": "别名：{{term}}"
   }
 }

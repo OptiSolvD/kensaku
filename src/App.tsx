@@ -36,6 +36,7 @@ import { normalizeTheme } from "./hooks/useTheme";
 import { useLanguage } from "./hooks/useLanguage";
 import { PreviewDialog } from "./components/PreviewDialog";
 import { classify } from "./lib/categories";
+import { interpretationLabel } from "./lib/interpretation";
 import { inFilter } from "./lib/query";
 import { isNewerVersion } from "./lib/version";
 import { getVersion } from "@tauri-apps/api/app";
@@ -525,23 +526,28 @@ function App() {
 
   /* ---------------- actions ---------------- */
 
+  // Launcher mode gets out of the way once a file opens; a desktop-app window
+  // stays where it is, like any other app. Until the config arrives, do not
+  // hide: an app-mode window must never be mistaken for a launcher.
+  const hideAfterOpen = config ? config.app_mode !== "app" : false;
+
   const handleOpenFile = useCallback(async (path: string) => {
     try {
       await invoke("open_file", { path });
-      await invoke("hide_window");
+      if (hideAfterOpen) await invoke("hide_window");
     } catch (err) {
       console.error("Open file error:", err);
     }
-  }, []);
+  }, [hideAfterOpen]);
 
   const handleOpenFolder = useCallback(async (path: string) => {
     try {
       await invoke("open_folder", { path });
-      await invoke("hide_window");
+      if (hideAfterOpen) await invoke("hide_window");
     } catch (err) {
       console.error("Open folder error:", err);
     }
-  }, []);
+  }, [hideAfterOpen]);
 
   const handleRunCommand = useCallback(async (cmdStr: string) => {
     try {
@@ -965,7 +971,9 @@ function App() {
         inputRef.current?.focus();
         return;
       }
-      if (config?.app_mode === "app") return;
+      // Only hide once the mode is known and it is a launcher; an app-mode
+      // window keeps its content when the user presses Escape.
+      if (!config || config.app_mode === "app") return;
       e.preventDefault();
       invoke("hide_window").catch(() => undefined);
     };
@@ -980,7 +988,9 @@ function App() {
   useEffect(() => {
     const onBlur = () => {
       if (isSetupComplete !== true) return;
-      if (config?.app_mode === "app") return;
+      // The config may not have arrived yet on a fresh window; never treat an
+      // app-mode window as a launcher in that gap.
+      if (!config || config.app_mode === "app") return;
       if (showSettings || showDuplicates || showHelp || preview || details || saveOpen || menu) return;
       invoke("hide_window").catch(() => undefined);
     };
@@ -1099,7 +1109,7 @@ function App() {
                       }
                       className="group flex h-6 items-center gap-1.5 rounded-full bg-accent-soft px-2.5 text-[12px] text-fg shadow-[inset_0_0_0_1px_var(--border)] transition-colors hover:text-danger"
                     >
-                      {c.label}
+                      {interpretationLabel(c, t)}
                       <X className="h-2.5 w-2.5 opacity-50 group-hover:opacity-100" />
                     </button>
                   ))}

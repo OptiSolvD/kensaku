@@ -286,17 +286,17 @@ export function SetupModal({ onSetupCompleted }: { onSetupCompleted: () => void 
     }
   };
 
-  /* The search window is a floating popup: always on top, no taskbar entry.
-     Setup can index for a long time, so while it is up the window behaves
+  /* Setup can index for a long time, so while it is up the window behaves
      like a normal app window that can be minimized and found again in the
-     taskbar. The popup behavior comes back when setup closes. */
+     taskbar. When the wizard closes, the backend applies the mode the user
+     chose (app or launcher); restoring launcher behavior unconditionally
+     would override an app-mode choice. */
   useEffect(() => {
     const win = getCurrentWindow();
     win.setSkipTaskbar(false).catch(() => {});
     win.setAlwaysOnTop(false).catch(() => {});
     return () => {
-      win.setSkipTaskbar(true).catch(() => {});
-      win.setAlwaysOnTop(true).catch(() => {});
+      invoke("apply_window_mode").catch(() => undefined);
     };
   }, []);
 
@@ -327,15 +327,19 @@ export function SetupModal({ onSetupCompleted }: { onSetupCompleted: () => void 
           <div className="space-y-3">
             <h1 className="t-title rise-in text-fg">{t("done.title")}</h1>
             <p className="t-lead rise-in max-w-sm text-muted" style={{ ["--stagger-delay" as string]: "60ms" }}>
-              <Trans
-                i18nKey="done.pressShortcut"
-                ns="setup"
-                values={{ shortcut }}
-                components={{ kbd: <span className="kbd align-middle" /> }}
-              />
+              {appMode === "app" ? (
+                t("done.openFromTaskbar")
+              ) : (
+                <Trans
+                  i18nKey="done.pressShortcut"
+                  ns="setup"
+                  values={{ shortcut }}
+                  components={{ kbd: <span className="kbd align-middle" /> }}
+                />
+              )}
             </p>
             <p className="rise-in max-w-sm text-[12px] leading-[18px] text-blue" style={{ ["--stagger-delay" as string]: "90ms" }}>
-              {t("done.closingNote")}
+              {appMode === "app" ? t("done.quitNote") : t("done.closingNote")}
             </p>
           </div>
           <dl className="rise-in grid grid-cols-2 gap-8" style={{ ["--stagger-delay" as string]: "120ms" }}>
@@ -421,7 +425,7 @@ export function SetupModal({ onSetupCompleted }: { onSetupCompleted: () => void 
     <Shell
       mark={`0${step + 1} / 03`}
       trailing={<>{themeButton}{minimizeButton}</>}
-      brand={<BrandMoment word="検索" gloss="to search." />}
+      brand={<BrandMoment word="検索" gloss={t("brand.search")} />}
     >
       {step === 0 && (
         <div key="s0" className="section-enter flex min-h-0 flex-1 flex-col gap-8 overflow-y-auto pt-2">

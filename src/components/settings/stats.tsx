@@ -49,6 +49,7 @@ function Dot({ ok, label }: { ok: boolean; label: string }) {
 
 export function StatsForNerds() {
   const { t } = useTranslation("settings");
+  const { t: tCommon } = useTranslation("common");
   const { stats, live } = useStats(2000);
   const [copied, setCopied] = useState(false);
   const [rebuilding, setRebuilding] = useState(false);
@@ -185,7 +186,7 @@ export function StatsForNerds() {
             </div>
             <span className="font-mono text-[11px] text-subtle">
               {ing.files_per_sec > 0 ? `${formatComma(Math.round(ing.files_per_sec))} f/s` : t("stats.idle")}
-              {ing.eta_secs != null && ing.eta_secs > 0 && ` · ${t("stats.eta", { time: formatDuration(ing.eta_secs) })}`}
+              {ing.eta_secs != null && ing.eta_secs > 0 && ` · ${t("stats.eta", { time: formatDuration(ing.eta_secs, tCommon) })}`}
             </span>
           </div>
           {/* Indeterminate when no total is known; depth signals backlog. */}
@@ -207,7 +208,7 @@ export function StatsForNerds() {
       {/* Runtime */}
       <Card title={t("stats.runtime")}>
         <div className="grid grid-cols-2 gap-x-6 px-4 py-3 sm:grid-cols-3">
-          <StatNumber value={formatDuration(rt.uptime_secs)} caption={t("stats.uptime")} />
+          <StatNumber value={formatDuration(rt.uptime_secs, tCommon)} caption={t("stats.uptime")} />
           <StatNumber value={formatBytes(rt.rss_bytes)} caption={t("stats.rss")} />
           <StatNumber value={rt.model_id || "—"} caption={t("stats.semanticModel")} />
         </div>

@@ -1,4 +1,4 @@
-﻿import { useTranslation } from "react-i18next";
+import { useTranslation } from "react-i18next";
 import { Bookmark, ChevronDown, LayoutGrid, Rows3 } from "lucide-react";
 
 /* Right side of the toolbar: sort, layout, save. Same capsule material as

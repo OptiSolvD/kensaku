@@ -96,6 +96,7 @@ Filename tools are everywhere. Reading *inside* your files — locally, instantl
 
 **A real launcher**
 - Starts hidden in the tray and summons with a keystroke. Recents are ranked by what you actually opened, and they survive restarts.
+- Or switch to **Desktop app** mode: a normal taskbar window that stays open and quits on close. Setup defaults to this; the launcher is one click away in Settings.
 - Space previews (Quick Look) for PDFs, images, and text. Grid or list layout. Full keyboard navigation.
 
 **Works with AI agents**

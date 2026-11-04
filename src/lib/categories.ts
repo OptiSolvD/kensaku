@@ -31,20 +31,19 @@ const ARCHIVE_EXT = new Set(["zip", "tar", "gz", "rar", "7z", "bz2", "xz", "dmg"
 /** Chip row definition. `token` maps to the query filter syntax. */
 export interface CategoryChip {
   id: Category | "all" | "recent";
-  label: string;
   token?: string; // query token appended, e.g. "type:image"
   stripTokens?: string[]; // tokens removed when selected (disambiguation)
 }
 
 export const CATEGORY_CHIPS: CategoryChip[] = [
-  { id: "all", label: "All" },
-  { id: "file", label: "Files", token: "type:file" },
-  { id: "folder", label: "Folders", token: "type:dir" },
-  { id: "image", label: "Images", token: "type:image" },
-  { id: "doc", label: "Docs", token: "type:doc" },
-  { id: "code", label: "Code", token: "type:code" },
-  { id: "media", label: "Media", token: "type:media" },
-  { id: "recent", label: "Recent", token: "modified:<7d" },
+  { id: "all" },
+  { id: "file", token: "type:file" },
+  { id: "folder", token: "type:dir" },
+  { id: "image", token: "type:image" },
+  { id: "doc", token: "type:doc" },
+  { id: "code", token: "type:code" },
+  { id: "media", token: "type:media" },
+  { id: "recent", token: "modified:<7d" },
 ];
 
 export function classify(result: { is_dir: boolean; filename: string }): Category {

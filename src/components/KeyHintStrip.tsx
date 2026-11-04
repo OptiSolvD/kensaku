@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import type { IndexingStatus, DoctorReport } from "../types";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";

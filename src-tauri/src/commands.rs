@@ -970,6 +970,20 @@ pub async fn save_config(config: KensakuConfig, state: State<'_, AppState>, app:
     Ok(())
 }
 
+/// Applies the saved window mode to the live window.
+///
+/// Setup keeps a normal taskbar window while it indexes (which can take a long
+/// time) and calls this when the wizard closes, so the chosen mode only takes
+/// effect once setup stops owning the window.
+#[tauri::command]
+pub async fn apply_window_mode(app: AppHandle) -> Result<(), String> {
+    let config = KensakuConfig::load();
+    if let Some(window) = app.get_webview_window(crate::main_window::LABEL) {
+        crate::main_window::apply_mode(&window, &config.app_mode);
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn is_setup_complete() -> Result<bool, String> {
     Ok(KensakuConfig::is_setup_done())
@@ -1036,11 +1050,9 @@ pub async fn complete_setup(
         state.indexer.start_indexing();
     }
 
-    // Apply the chosen window mode to the setup window immediately, then
-    // register the global shortcut only in launcher mode.
-    if let Some(window) = app.get_webview_window(crate::main_window::LABEL) {
-        crate::main_window::apply_mode(&window, &config.app_mode);
-    }
+    // The wizard keeps the window in taskbar mode while it indexes. The
+    // frontend applies the chosen mode in `apply_window_mode` when setup
+    // closes; here we only register the global shortcut in launcher mode.
     let _ = app.global_shortcut().unregister_all();
     if config.app_mode == "launcher"
         && let Ok(sc) = Shortcut::from_str(&config.shortcut)

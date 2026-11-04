@@ -1,5 +1,9 @@
+import type { TFunction } from "i18next";
+
 /* Formatting helpers shared across components. Monospace-facing so that
-   numbers tabulate cleanly in the status bar, stats and result rows. */
+   numbers tabulate cleanly in the status bar, stats and result rows.
+   Locale-dependent helpers take the caller's `t` so the language can change
+   without a reload and without importing the global i18n instance here. */
 
 export function formatBytes(bytes: number): string {
   if (!bytes || bytes <= 0) return "0 B";
@@ -14,25 +18,30 @@ export function formatComma(n: number): string {
   return n.toLocaleString("en-US");
 }
 
-export function formatRelativeTime(secs: number): string {
+export function formatRelativeTime(secs: number, t: TFunction): string {
   if (!secs) return "";
   const now = Math.floor(Date.now() / 1000);
   const diff = Math.max(0, now - secs);
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  if (diff < 86400 * 30) return `${Math.floor(diff / 86400)}d ago`;
-  if (diff < 86400 * 365) return `${Math.floor(diff / (86400 * 30))}mo ago`;
-  return new Date(secs * 1000).toLocaleDateString();
+  if (diff < 60) return t("time.justNow");
+  if (diff < 3600) return t("time.minutesAgo", { count: Math.floor(diff / 60) });
+  if (diff < 86400) return t("time.hoursAgo", { count: Math.floor(diff / 3600) });
+  if (diff < 86400 * 30) return t("time.daysAgo", { count: Math.floor(diff / 86400) });
+  if (diff < 86400 * 365) {
+    return t("time.monthsAgo", { count: Math.floor(diff / (86400 * 30)) });
+  }
+  return t("time.yearsAgo", { count: Math.floor(diff / (86400 * 365)) });
 }
 
-export function formatDuration(secs: number): string {
-  if (!secs || secs <= 0) return "0s";
-  if (secs < 60) return `${Math.round(secs)}s`;
+export function formatDuration(secs: number, t: TFunction): string {
+  if (!secs || secs <= 0) return t("time.duration.zero");
+  if (secs < 60) return t("time.duration.seconds", { count: Math.round(secs) });
   const m = Math.floor(secs / 60);
   const h = Math.floor(m / 60);
-  if (h > 0) return `${h}h ${m % 60}m`;
-  return `${m}m ${Math.floor(secs % 60)}s`;
+  if (h > 0) return t("time.duration.hours", { hours: h, minutes: m % 60 });
+  return t("time.duration.minutesSeconds", {
+    minutes: m,
+    seconds: Math.floor(secs % 60),
+  });
 }
 
 /** Extracts the free-text search terms, dropping `filter:` tokens. */

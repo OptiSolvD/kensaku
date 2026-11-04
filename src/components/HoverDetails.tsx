@@ -16,6 +16,7 @@ interface Details {
 
 export function HoverDetails({ result }: { result: SearchResult }) {
   const { t } = useTranslation("results");
+  const { t: tCommon } = useTranslation("common");
   const [details, setDetails] = useState<Details>({});
 
   useEffect(() => {
@@ -34,7 +35,7 @@ export function HoverDetails({ result }: { result: SearchResult }) {
   const parts = [
     result.is_dir ? t("hover.folder") : formatBytes(result.file_size),
     details.width && details.height ? `${details.width}×${details.height}` : null,
-    formatRelativeTime(result.modified),
+    formatRelativeTime(result.modified, tCommon),
   ].filter(Boolean) as string[];
 
   return (

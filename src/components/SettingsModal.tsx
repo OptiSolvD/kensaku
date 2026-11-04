@@ -279,6 +279,7 @@ function GeneralSection({
   setConfig: React.Dispatch<React.SetStateAction<KensakuConfig | null>>;
 }) {
   const { t } = useTranslation("settings");
+  const { t: te } = useTranslation("errors");
   const { theme, setTheme } = useTheme();
   const { language, setLanguage, supportedLanguages } = useLanguage();
   const [capturing, setCapturing] = useState(false);
@@ -313,7 +314,7 @@ function GeneralSection({
       await invoke("set_autostart", { enabled: next });
     } catch (err) {
       setAutostart(prev);
-      setAutostartError(reasonFrom(err));
+      setAutostartError(reasonFrom(err, te("unknown")));
     } finally {
       setAutostartBusy(false);
     }
@@ -378,7 +379,13 @@ function GeneralSection({
           <div className="text-[13px] text-fg">{t("appearance.language")}</div>
           <select
             value={language ?? ""}
-            onChange={(e) => setLanguage(e.target.value === "" ? null : (e.target.value as any))}
+            onChange={(e) => {
+              const value = e.target.value === "" ? null : (e.target.value as "en" | "zh");
+              setLanguage(value);
+              /* Match the ThemeSwatch handling: keep the settings snapshot in
+                 step so a later Save does not write the old language back. */
+              setConfig((c) => (c ? { ...c, language: value } : c));
+            }}
             className="h-8 rounded-control border border-line bg-surface px-2 text-[13px] text-fg"
           >
             <option value="">{t("appearance.auto")}</option>
@@ -1093,6 +1100,7 @@ function BetaSection({
 
 function AgentConnectCard() {
   const { t } = useTranslation("settings");
+  const { t: te } = useTranslation("errors");
   const [statuses, setStatuses] = useState<ClientStatus[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -1116,7 +1124,7 @@ function AgentConnectCard() {
       const outcome = await invoke<InstallOutcome>("agent_connect_install", { client: id });
       setNotice(outcome.message);
     } catch (err) {
-      setNotice(reasonFrom(err));
+      setNotice(reasonFrom(err, te("unknown")));
     } finally {
       setBusy(null);
       void refresh();

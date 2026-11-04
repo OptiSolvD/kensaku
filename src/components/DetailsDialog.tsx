@@ -16,6 +16,7 @@ export function DetailsDialog({
   onClose: () => void;
 }) {
   const { t } = useTranslation("details");
+  const { t: tCommon } = useTranslation("common");
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -30,7 +31,7 @@ export function DetailsDialog({
   const rows: [string, string][] = [
     [t("location"), result.path],
     [t("size"), formatBytes(result.file_size)],
-    [t("modified"), formatRelativeTime(result.modified)],
+    [t("modified"), formatRelativeTime(result.modified, tCommon)],
     [t("matchedBy"), matchLabel(result.match_type, t)],
     [t("score"), result.score.toFixed(2)],
   ];

@@ -61,12 +61,26 @@ i18n
     resources,
     fallbackLng: "en",
     supportedLngs: Object.keys(SUPPORTED_LANGUAGES),
+    // Browsers report "zh-CN"/"zh-TW"; both should match the "zh" bundle.
+    load: "languageOnly",
     defaultNS: "common",
-    ns: ["common"],
+    ns: [
+      "common",
+      "search",
+      "home",
+      "results",
+      "details",
+      "help",
+      "settings",
+      "setup",
+      "errors",
+    ],
     interpolation: { escapeValue: false },
     detection: {
       order: ["localStorage", "navigator"],
-      caches: ["localStorage"],
+      // The hook owns persistence: writing here too would turn "Auto" into a
+      // frozen detected language on the next launch.
+      caches: [],
       lookupLocalStorage: "kensaku.language",
     },
     react: { useSuspense: false },

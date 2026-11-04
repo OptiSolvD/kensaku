@@ -28,17 +28,19 @@ fn existing(app: &AppHandle) -> Option<WebviewWindow> {
 }
 
 fn create(app: &AppHandle) -> tauri::Result<WebviewWindow> {
-    // In "app" mode the window is a normal application window: it shows in
-    // the dock/taskbar and is not pinned above other windows. In "launcher"
-    // mode (default) it stays off the taskbar and floats like a palette.
+    // In "app" mode the window is a normal application window: decorated,
+    // opaque, in the dock/taskbar, and not pinned above other windows. In
+    // "launcher" mode it stays frameless, off the taskbar, and floats like a
+    // palette. (`app_mode` itself defaults to launcher in the config so
+    // existing installs keep their behavior; Setup defaults new users to app.)
     let app_mode = crate::config::KensakuConfig::load().app_mode;
     let launcher = app_mode != "app";
     let window = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("index.html".into()))
         .title("Kensaku")
         .inner_size(920.0, 640.0)
         .min_inner_size(720.0, 520.0)
-        .decorations(false)
-        .transparent(true)
+        .decorations(!launcher)
+        .transparent(launcher)
         .always_on_top(launcher)
         .skip_taskbar(launcher)
         .visible_on_all_workspaces(launcher)
@@ -67,11 +69,12 @@ fn create(app: &AppHandle) -> tauri::Result<WebviewWindow> {
     Ok(window)
 }
 
-/// Applies the parts of `app_mode` that can change on a live window. Window
-/// decorations are fixed at creation; everything users notice (taskbar,
-/// floating, other workspaces) updates immediately.
+/// Applies the parts of `app_mode` that can change on a live window. App mode
+/// gets native decorations (title bar, minimize/close) so it behaves like a
+/// normal desktop window; launcher mode stays frameless.
 pub fn apply_mode(window: &WebviewWindow, app_mode: &str) {
     let launcher = app_mode != "app";
+    let _ = window.set_decorations(!launcher);
     let _ = window.set_skip_taskbar(launcher);
     let _ = window.set_always_on_top(launcher);
     let _ = window.set_visible_on_all_workspaces(launcher);
@@ -89,14 +92,16 @@ fn report_creation_failure(app: &AppHandle, error: &str) {
     } else {
         ""
     };
-    let _ = app
-        .dialog()
+    // `blocking_show` must not run on the main thread, and this is called from
+    // `.setup` and tray handlers. `show` is non-blocking and posts the dialog
+    // to the platform's event loop.
+    app.dialog()
         .message(format!(
             "Kensaku could not open its window.\n\n{error}{hint}\n\nDetails were written to:\n{}",
             crate::crashlog::path().display()
         ))
         .title("Kensaku could not start")
-        .blocking_show();
+        .show(|_| {});
 }
 
 /// Shows the search window, creating it if it was hidden (destroyed).

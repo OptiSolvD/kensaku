@@ -68,10 +68,11 @@ export function useLanguage() {
   }, []);
 
   const setLanguage = useCallback((lang: SupportedLanguage | null) => {
+    // localStorage is the immediate source of truth (the hook writes it in the
+    // effect above). Settings also updates its config snapshot and persists it
+    // with the normal Save, so a read-modify-write here would only race that
+    // Save and could clobber other edits.
     setLanguageState(lang);
-    invoke<{ language?: string | null }>("get_config")
-      .then((cfg) => invoke("save_config", { config: { ...cfg, language: lang } }))
-      .catch((err) => console.warn("save_config (language) failed:", err));
   }, []);
 
   return {

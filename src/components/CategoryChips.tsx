@@ -38,7 +38,7 @@ export const CategoryChips: React.FC<CategoryChipsProps> = ({ results, facets, s
               data-active={isSelected && !isExcluded}
               className={`seg !px-3 ${isExcluded ? "text-danger line-through" : ""} ${dim ? "opacity-40" : ""}`}
             >
-              <span>{chip.label}</span>
+              <span>{t(`categories.${chip.id}`)}</span>
               {hasAny && count != null && count > 0 && (
                 <span className="t-meta text-[10px] text-subtle">{formatComma(count)}</span>
               )}

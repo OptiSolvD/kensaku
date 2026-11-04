@@ -29,6 +29,7 @@ function RecentTile({
   const name = item.filename || item.path;
   const ref = useRef<HTMLButtonElement>(null);
   const { t } = useTranslation("home");
+  const { t: tCommon } = useTranslation("common");
   /* Keyboard walks go below the fold: keep the focused tile in sight. */
   useEffect(() => {
     if (focused) ref.current?.scrollIntoView({ block: "nearest" });
@@ -58,7 +59,7 @@ function RecentTile({
       <span className="flex min-w-0 flex-col px-0.5 pt-2">
         <span className="truncate text-[13px] font-medium leading-[18px] text-fg">{name}</span>
         <span className="t-meta truncate text-subtle">
-          {item.last_open > 0 ? t("opened", { time: formatRelativeTime(item.last_open) }) : formatRelativeTime(item.modified)}
+          {item.last_open > 0 ? t("opened", { time: formatRelativeTime(item.last_open, tCommon) }) : formatRelativeTime(item.modified, tCommon)}
         </span>
       </span>
     </button>
