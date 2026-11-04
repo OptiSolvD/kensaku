@@ -140,10 +140,9 @@ fn main() {
             std::process::exit(1);
         }
     };
-    use fs4::fs_std::FileExt;
-    match lock_file.try_lock_exclusive() {
-        Ok(true) => {}
-        _ => {
+    match lock_file.try_lock() {
+        Ok(()) => {}
+        Err(_) => {
             eprintln!("kensaku-daemon: another daemon is running; exiting");
             std::process::exit(0);
         }
