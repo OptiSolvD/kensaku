@@ -95,7 +95,7 @@ the fast, trustworthy index by default. An **optional** local Ollama/LM Studio
 connection may compile plain-language intent and power `/ask` with path
 citations; agents bring their own model through MCP. No model is bundled, and
 file contents never leave the machine unless you explicitly configure a cloud
-provider. Kensaku is local-first by design.
+provider — Kensaku is local-first by design.
 
 **How do I contribute?**
 See [`CONTRIBUTING.md`](CONTRIBUTING.md). Tests and clippy must pass.
