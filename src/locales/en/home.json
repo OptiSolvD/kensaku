@@ -1,0 +1,6 @@
+{
+  "opened": "Opened {{time}}",
+  "saved": "Saved",
+  "recent": "Recent",
+  "emptyHint": "Ask for a file the way you'd describe it to a friend."
+}

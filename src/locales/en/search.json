@@ -1,0 +1,66 @@
+{
+  "placeholder": "Search files, content, meaning…",
+  "command": "Command",
+  "clearInput": "Clear (Esc)",
+  "placeholderEmpty": "Type to search",
+  "resultCount": "{{count}} results",
+  "resultCount_one": "{{count}} result",
+  "resultCount_other": "{{count}} results",
+  "modes": {
+    "ranked": "Ranked",
+    "exhaustive": "Exhaustive"
+  },
+  "sort": {
+    "best": "Best match",
+    "newest": "Newest",
+    "oldest": "Oldest",
+    "largest": "Largest",
+    "name": "Name",
+    "label": "Sort results"
+  },
+  "view": {
+    "grid": "Grid view",
+    "list": "List view",
+    "layout": "Layout",
+    "gridShort": "Grid",
+    "listShort": "List"
+  },
+  "saveSearch": "Save this search",
+  "filters": {
+    "type": "Type",
+    "ext": "Extension",
+    "in": "In folder",
+    "modified": "Modified",
+    "size": "Size",
+    "clear": "Clear filters",
+    "addFilter": "Add filter"
+  },
+  "slashMenu": {
+    "search": "Search",
+    "filter": "Filter",
+    "help": "Help",
+    "settings": "Settings",
+    "reindex": "Reindex",
+    "recent": "Recent queries"
+  },
+  "contextMenu": {
+    "open": "Open",
+    "reveal": "Reveal in folder",
+    "copyPath": "Copy path",
+    "copyName": "Copy name",
+    "details": "Details",
+    "preview": "Preview",
+    "quickLook": "Quick look"
+  },
+  "empty": {
+    "noResults": "No results",
+    "noResultsHint": "Try a different query or broaden your filters.",
+    "noIndex": "No index yet",
+    "noIndexHint": "Choose folders in Setup to start indexing."
+  },
+  "chips": {
+    "remove": "Remove",
+    "excluded": "Excluded. Click to clear",
+    "includeHint": "Click to include, Alt-click to exclude"
+  }
+}

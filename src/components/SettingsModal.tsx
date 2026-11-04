@@ -25,6 +25,7 @@ import {
   InstallOutcome,
 } from "../types";
 import { useTheme } from "../hooks/useTheme";
+import { useLanguage } from "../hooks/useLanguage";
 import { useStats } from "../hooks/useStats";
 import { Card, Field, Switch, Stepper, SectionHeader, reasonFrom } from "./settings/kit";
 import { OcrField } from "./settings/ocr";
@@ -286,6 +287,7 @@ function GeneralSection({
   setConfig: React.Dispatch<React.SetStateAction<KensakuConfig | null>>;
 }) {
   const { theme, setTheme } = useTheme();
+  const { language, setLanguage, supportedLanguages } = useLanguage();
   const [capturing, setCapturing] = useState(false);
 
   /* null = unknown (backend rejected get_autostart) → switch stays off. */
@@ -378,6 +380,19 @@ function GeneralSection({
               }}
             />
           ))}
+        </div>
+        <div className="flex items-center justify-between border-t border-line px-4 py-3">
+          <div className="text-[13px] text-fg">Language</div>
+          <select
+            value={language ?? ""}
+            onChange={(e) => setLanguage(e.target.value === "" ? null : (e.target.value as any))}
+            className="h-8 rounded-control border border-line bg-surface px-2 text-[13px] text-fg"
+          >
+            <option value="">Auto (system)</option>
+            {Object.entries(supportedLanguages).map(([code, name]) => (
+              <option key={code} value={code}>{name}</option>
+            ))}
+          </select>
         </div>
       </Card>
 

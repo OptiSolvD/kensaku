@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { CATEGORY_CHIPS, categoryCounts } from "../lib/categories";
 import { Facets, SearchResult } from "../types";
 import { formatComma } from "../lib/format";
@@ -16,6 +17,7 @@ interface CategoryChipsProps {
 }
 
 export const CategoryChips: React.FC<CategoryChipsProps> = ({ results, facets, selected, excluded, onToggle }) => {
+  const { t } = useTranslation("search");
   const counts = facets ? { all: facets.all, recent: facets.recent, ...facets.types } : categoryCounts(results);
   const empty = selected.size === 0 && excluded.size === 0;
   const hasAny = results.length > 0;
@@ -32,7 +34,7 @@ export const CategoryChips: React.FC<CategoryChipsProps> = ({ results, facets, s
               key={chip.id}
               type="button"
               onClick={(e) => onToggle(chip.id, e.altKey)}
-              title={isExcluded ? "Excluded. Click to clear" : "Click to include, Alt-click to exclude"}
+              title={isExcluded ? t("chips.excluded") : t("chips.includeHint")}
               data-active={isSelected && !isExcluded}
               className={`seg !px-3 ${isExcluded ? "text-danger line-through" : ""} ${dim ? "opacity-40" : ""}`}
             >

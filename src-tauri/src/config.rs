@@ -186,7 +186,11 @@ pub struct KensakuConfig {
     /// configs are migrated at load (v5).
     #[serde(default = "default_theme")]
     pub theme: String,
-    /// Personal vocabulary: `term` matches any of `expansions`.
+    /// UI language code ("en", "zh", …) or None for auto-detect from the
+    /// system locale. Added in v7.
+    #[serde(default)]
+    pub language: Option<String>,
+    /// Personal vocabulary: `term` matches any of `expansions`.</arg_value>
     #[serde(default = "default_aliases")]
     pub aliases: Vec<Alias>,
     /// Saved queries shown on the home screen.
@@ -306,8 +310,17 @@ pub fn normalize_theme(raw: &str) -> String {
     }
 }
 
+/// Canonicalizes a language code to a supported value, or None for auto-detect.
+pub fn normalize_language(raw: &str) -> Option<String> {
+    let v = raw.trim().to_ascii_lowercase();
+    match v.as_str() {
+        "en" | "zh" | "ja" | "es" | "fr" | "de" | "ko" | "pt" | "ru" | "it" => Some(v),
+        _ => None,
+    }
+}
+
 /// Version written by this build; see `parse_and_migrate`.
-pub const CURRENT_CONFIG_VERSION: u32 = 6;
+pub const CURRENT_CONFIG_VERSION: u32 = 7;
 
 /// Extensions skipped entirely (not even indexed by name).
 const DEFAULT_EXCLUDED_EXTENSIONS: &[&str] = &[
@@ -438,6 +451,7 @@ impl Default for KensakuConfig {
             ocr_engine: default_ocr_engine(),
             app_mode: default_app_mode(),
             theme: default_theme(),
+            language: None,
             aliases: default_aliases(),
             saved_searches: Vec::new(),
             pins: Vec::new(),
@@ -582,6 +596,14 @@ impl KensakuConfig {
                 cfg.content_depth = default_content_depth();
             }
             cfg.config_version = 6;
+            migrated = true;
+        }
+
+        if cfg.config_version < 7 {
+            // v7: UI language support. Normalize any persisted value; unknown
+            // codes fall back to auto-detect (None).
+            cfg.language = cfg.language.as_deref().and_then(normalize_language);
+            cfg.config_version = 7;
             migrated = true;
         }
 

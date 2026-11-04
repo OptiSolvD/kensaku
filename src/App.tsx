@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import {
@@ -71,6 +72,7 @@ function putSnippet(
 }
 
 function App() {
+  const { t } = useTranslation("search");
   const [isSetupComplete, setIsSetupComplete] = useState<boolean | null>(null);
   const [query, setQuery] = useState("");
 
@@ -1014,11 +1016,11 @@ function App() {
               y={menu.y}
               onClose={() => setMenu(null)}
               items={[
-                { label: "Open", onSelect: () => handleOpenFile(menu.result.path) },
-                { label: "Preview", onSelect: () => setPreview(menu.result) },
-                { label: "Show in folder", onSelect: () => handleOpenFolder(menu.result.path) },
-                { label: "Copy path", onSelect: () => handleCopyPath(menu.result.path) },
-                { label: "Details", onSelect: () => setDetails(menu.result), separatorBefore: true },
+                { label: t("contextMenu.open"), onSelect: () => handleOpenFile(menu.result.path) },
+                { label: t("contextMenu.preview"), onSelect: () => setPreview(menu.result) },
+                { label: t("contextMenu.reveal"), onSelect: () => handleOpenFolder(menu.result.path) },
+                { label: t("contextMenu.copyPath"), onSelect: () => handleCopyPath(menu.result.path) },
+                { label: t("contextMenu.details"), onSelect: () => setDetails(menu.result), separatorBefore: true },
               ] as ContextMenuItem[]}
             />
           )}

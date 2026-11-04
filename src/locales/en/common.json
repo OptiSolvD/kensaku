@@ -1,0 +1,52 @@
+{
+  "app": { "name": "Kensaku" },
+  "actions": {
+    "close": "Close",
+    "cancel": "Cancel",
+    "save": "Save",
+    "copy": "Copy",
+    "open": "Open",
+    "reveal": "Reveal in folder",
+    "details": "Details",
+    "preview": "Preview",
+    "search": "Search",
+    "retry": "Retry",
+    "reset": "Reset"
+  },
+  "units": {
+    "files": "files",
+    "folders": "folders",
+    "results": "results",
+    "result_one": "result",
+    "result_other": "results"
+  },
+  "time": {
+    "justNow": "just now",
+    "minutesAgo": "{{count}}m ago",
+    "hoursAgo": "{{count}}h ago",
+    "daysAgo": "{{count}}d ago"
+  },
+  "status": {
+    "loading": "Loading…",
+    "indexing": "Indexing…",
+    "verifying": "Verifying files…",
+    "ready": "Ready",
+    "paused": "Indexing paused",
+    "rebuilding": "Rebuilding index…",
+    "indexingProgress": "Indexing {{done}} of {{total}}",
+    "indexingFiles": "Indexing {{count}} files",
+    "embedding": "{{count}} files · building semantic index",
+    "filesCount": "{{count}} files"
+  },
+  "health": {
+    "issue_one": "{{count}} health issue — open Health",
+    "issue_other": "{{count}} health issues — open Health",
+    "issuesShort_one": "{{count}} issue",
+    "issuesShort_other": "{{count}} issues",
+    "ok": "Index health OK"
+  },
+  "update": {
+    "available": "Update available: {{version}}",
+    "label": "Update"
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "placeholder": "搜索文件、内容、含义…",
+  "command": "命令",
+  "clearInput": "清除 (Esc)",
+  "placeholderEmpty": "输入以搜索",
+  "resultCount": "{{count}} 条结果",
+  "resultCount_one": "{{count}} 条结果",
+  "resultCount_other": "{{count}} 条结果",
+  "modes": {
+    "ranked": "相关度",
+    "exhaustive": "穷举"
+  },
+  "sort": {
+    "best": "最佳匹配",
+    "newest": "最新",
+    "oldest": "最早",
+    "largest": "最大",
+    "name": "名称",
+    "label": "排序结果"
+  },
+  "view": {
+    "grid": "网格视图",
+    "list": "列表视图",
+    "layout": "布局",
+    "gridShort": "网格",
+    "listShort": "列表"
+  },
+  "saveSearch": "保存此搜索",
+  "filters": {
+    "type": "类型",
+    "ext": "扩展名",
+    "in": "文件夹",
+    "modified": "修改时间",
+    "size": "大小",
+    "clear": "清除筛选",
+    "addFilter": "添加筛选"
+  },
+  "slashMenu": {
+    "search": "搜索",
+    "filter": "筛选",
+    "help": "帮助",
+    "settings": "设置",
+    "reindex": "重新索引",
+    "recent": "最近查询"
+  },
+  "contextMenu": {
+    "open": "打开",
+    "reveal": "在文件夹中显示",
+    "copyPath": "复制路径",
+    "copyName": "复制名称",
+    "details": "详情",
+    "preview": "预览",
+    "quickLook": "快速预览"
+  },
+  "empty": {
+    "noResults": "无结果",
+    "noResultsHint": "请尝试其他查询或放宽筛选条件。",
+    "noIndex": "尚未建立索引",
+    "noIndexHint": "在设置中选择文件夹以开始索引。"
+  },
+  "chips": {
+    "remove": "移除",
+    "excluded": "已排除。点击以清除",
+    "includeHint": "点击以包含，Alt+点击以排除"
+  }
+}

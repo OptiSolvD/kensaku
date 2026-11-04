@@ -1,0 +1,52 @@
+{
+  "app": { "name": "Kensaku" },
+  "actions": {
+    "close": "关闭",
+    "cancel": "取消",
+    "save": "保存",
+    "copy": "复制",
+    "open": "打开",
+    "reveal": "在文件夹中显示",
+    "details": "详情",
+    "preview": "预览",
+    "search": "搜索",
+    "retry": "重试",
+    "reset": "重置"
+  },
+  "units": {
+    "files": "个文件",
+    "folders": "个文件夹",
+    "results": "条结果",
+    "result_one": "条结果",
+    "result_other": "条结果"
+  },
+  "time": {
+    "justNow": "刚刚",
+    "minutesAgo": "{{count}} 分钟前",
+    "hoursAgo": "{{count}} 小时前",
+    "daysAgo": "{{count}} 天前"
+  },
+  "status": {
+    "loading": "加载中…",
+    "indexing": "索引中…",
+    "verifying": "正在校验文件…",
+    "ready": "就绪",
+    "paused": "索引已暂停",
+    "rebuilding": "正在重建索引…",
+    "indexingProgress": "正在索引 {{done}} / {{total}}",
+    "indexingFiles": "正在索引 {{count}} 个文件",
+    "embedding": "{{count}} 个文件 · 正在构建语义索引",
+    "filesCount": "{{count}} 个文件"
+  },
+  "health": {
+    "issue_one": "{{count}} 个健康问题 — 打开健康检查",
+    "issue_other": "{{count}} 个健康问题 — 打开健康检查",
+    "issuesShort_one": "{{count}} 个问题",
+    "issuesShort_other": "{{count}} 个问题",
+    "ok": "索引健康正常"
+  },
+  "update": {
+    "available": "有可用更新：{{version}}",
+    "label": "更新"
+  }
+}
