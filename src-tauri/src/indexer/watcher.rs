@@ -431,11 +431,10 @@ fn rescan_watched_dirs(
         // corpora on mounted drives overflow inotify regularly). Pending
         // entries are still retried, and a changed file always differs in at
         // least one of mtime/size.
-        let unchanged = metadata.read().get(&entry.path).is_some_and(|existing| {
-            existing.modified == entry.modified
-                && existing.size == entry.size
-                && !existing.content_pending
-        });
+        let unchanged = metadata
+            .read()
+            .get(&entry.path)
+            .is_some_and(|existing| super::is_unchanged(&existing, entry));
         if unchanged {
             continue;
         }
