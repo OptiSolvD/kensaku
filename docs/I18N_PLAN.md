@@ -1,13 +1,13 @@
 # Kensaku i18n Plan
 
-Chinese first, then N languages. Status: **planned, not started.**
+Chinese first, then N languages. Status: **shipped for English and Chinese (Phase 1).** Lazy loading, Intl formatting, community translation, and additional languages remain future work.
 
 ## Goals
 
 - Ship a **fully working Chinese UI** on the main search screen without English leaking through.
-- Make adding language #3 (Japanese, Spanish, …) a **one-line change**, not another 500-key translation sprint.
+- Make adding language #3 (Japanese, Spanish, …) a **mechanical change** — a locale folder plus one config entry — not another 500-key translation sprint.
 - Let the community translate via a web UI (Crowdin) instead of PRs touching source code.
-- Keep the bundle small: only the active language's strings are loaded.
+- Keep the bundle small: only the active language's strings should be loaded (deferred; Phase 1 bundles both eagerly).
 
 ## Non-goals (v1)
 
@@ -21,10 +21,10 @@ Chinese first, then N languages. Status: **planned, not started.**
 - **Library:** `react-i18next` + `i18next` + `i18next-browser-languagedetector` (already installed).
 - **Namespaces (per feature, flat keys, max 2–3 levels deep):**
   `common`, `search`, `home`, `results`, `details`, `help`, `settings`, `setup`, `errors`.
-- **Lazy loading:** `i18next-resources-to-backend` dynamic-imports only the active language's namespace files. Adding a language = adding a folder; adding a namespace = adding a file.
+- **Loading:** Phase 1 imports both locale bundles eagerly; with two languages the extra weight is small. The planned follow-up is `i18next-resources-to-backend` dynamic imports so only the active language's namespace files load. Adding a language = adding a folder; adding a namespace = adding a file.
 - **Type safety:** `i18next` TS augmentation in `src/i18n/types.ts` so `t("search.placeholder")` is checked at compile time and missing keys fail `tsc`.
 - **Plurals/interpolation:** ICU-style via i18next (`_one`/`_other`, `{{count}}`). Chinese has no plural, but the same keys work for every language.
-- **Formatting:** `Intl.DateTimeFormat` / `NumberFormat` with the active locale (replace the hardcoded `"en-US"` in `src/lib/format.ts` and `SearchBar.tsx`).
+- **Formatting (future):** use `Intl.DateTimeFormat` / `NumberFormat` with the active locale (replace the remaining hardcoded `"en-US"` in `src/lib/format.ts` re-exports).
 - **Fallback:** `fallbackLng: "en"` so a missing key never shows a raw key or breaks the UI.
 - **Backend messages:** stay English. The UI maps known backend error codes to translated strings where it matters (e.g. "index not ready").
 

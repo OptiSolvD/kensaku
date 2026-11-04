@@ -107,6 +107,7 @@ Filename tools are everywhere. Reading *inside* your files — locally, instantl
 
 **Pleasant to use**
 - Light and dark themes. Continuous-corner cards, a borderless search field, and hover details — a calm, native-feeling interface.
+- English and Simplified Chinese interface, auto-detected from the system or chosen in Settings.
 - Right-click for open, show in folder, copy path, and details.
 
 <p align="center">
