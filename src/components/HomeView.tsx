@@ -80,8 +80,8 @@ export function HomeView({
   /** Keyboard-walk selection; mirrors the launcher's result selection. */
   focusIndex?: number | null;
 }) {
-  if (!data) return null;
   const { t } = useTranslation("home");
+  if (!data) return null;
   const recent = data.recent.slice(0, 18);
   const saved = data.saved_searches ?? [];
   const suggestions = [
