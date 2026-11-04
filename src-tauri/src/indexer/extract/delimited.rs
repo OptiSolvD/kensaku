@@ -141,7 +141,17 @@ fn sniff_delimiter(text: &str, hint: u8) -> u8 {
     let sample = clip_to_char_boundary(text, SNIFF_BYTES);
     // (delimiter, records that agree on the field count, field count)
     let mut best = (hint, 0usize, 0usize);
-    for candidate in [hint, b',', b';', b'\t'] {
+    // Scan each unique candidate exactly once: the old list repeated the
+    // hint (tab for `.tsv`, comma otherwise), so a quarter of the sniff
+    // work re-parsed the first scan. Ties prefer the earlier candidate, so
+    // the hint must lead: hint → comma → semi → tab for TSV, collapsed to
+    // comma → semi → tab for everything else.
+    let order: [u8; 3] = if hint == b'\t' {
+        *b"\t,;"
+    } else {
+        *b",;\t"
+    };
+    for candidate in order {
         let mut width = 0usize;
         let mut agreeing = 0usize;
         let mut seen = 0usize;
