@@ -1034,6 +1034,30 @@ mod tests {
     }
 
     #[test]
+    fn v7_migration_normalizes_language() {
+        assert_eq!(normalize_language("ZH"), Some("zh".to_string()));
+        assert_eq!(normalize_language(" en "), Some("en".to_string()));
+        assert_eq!(normalize_language("klingon"), None);
+
+        let legacy = r#"{
+            "watched_dirs": [],
+            "excluded_dirs": [],
+            "excluded_extensions": [],
+            "shortcut": "Alt+Space",
+            "max_results": 50,
+            "is_setup_complete": true,
+            "language": "ZH",
+            "config_version": 6
+        }"#;
+        let cfg = KensakuConfig::load_from_str(legacy);
+        assert_eq!(cfg.language.as_deref(), Some("zh"));
+        assert_eq!(cfg.config_version, CURRENT_CONFIG_VERSION);
+
+        let junk = legacy.replace("\"ZH\"", "\"klingon\"");
+        assert_eq!(KensakuConfig::load_from_str(&junk).language, None);
+    }
+
+    #[test]
     fn v2_migration_strips_dotted_document_and_image_extensions() {
         let legacy = r#"{
             "watched_dirs": [],

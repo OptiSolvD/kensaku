@@ -9,8 +9,6 @@ import { TypeTile } from "./TypeTile";
    last, as tiles. Saved searches sit on one quiet line above. With nothing
    recent, a single serif line and a few starting searches. */
 
-
-
 function RecentTile({
   item,
   index,
