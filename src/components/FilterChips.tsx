@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { ActiveFilter } from "../types";
 import { X, Folder } from "lucide-react";
 import { hintToken } from "../lib/hints";
@@ -19,6 +20,7 @@ export const FilterChips: React.FC<FilterChipsProps> = ({
   onRemoveFilter,
   onApplyHint,
 }) => {
+  const { t } = useTranslation("search");
   if (filters.length === 0 && hints.length === 0) return null;
 
   return (
@@ -27,7 +29,7 @@ export const FilterChips: React.FC<FilterChipsProps> = ({
         <button
           key={f.raw + i}
           type="button"
-          title={`Remove filter ${f.raw}`}
+          title={t("removeFilter", { filter: f.raw })}
           onClick={(e) => {
             e.stopPropagation();
             onRemoveFilter(f);

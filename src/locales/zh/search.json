@@ -3,6 +3,12 @@
   "command": "命令",
   "clearInput": "清除 (Esc)",
   "placeholderEmpty": "输入以搜索",
+  "placeholders": {
+    "everything": "搜索所有内容",
+    "invoice": "上周的发票",
+    "pdf": "type:pdf in:~/Projects",
+    "chart": "带图表的截图"
+  },
   "resultCount": "{{count}} 条结果",
   "resultCount_one": "{{count}} 条结果",
   "resultCount_other": "{{count}} 条结果",
@@ -26,6 +32,16 @@
     "listShort": "列表"
   },
   "saveSearch": "保存此搜索",
+  "saveName": "为此搜索命名",
+  "understoodAs": "理解为",
+  "removeInterpretation": "移除“{{source}}”",
+  "removeFilter": "移除筛选 {{filter}}",
+  "removeFilters": "清除筛选",
+  "tryPdf": "试试 type:pdf",
+  "onlyFolders": "只看文件夹",
+  "noResultsNothing": "还没有名为 {{query}} 的结果。",
+  "settingsTitle": "设置",
+  "toast": { "pathCopied": "已复制路径" },
   "filters": {
     "type": "类型",
     "ext": "扩展名",
@@ -42,6 +58,20 @@
     "settings": "设置",
     "reindex": "重新索引",
     "recent": "最近查询"
+  },
+  "slash": {
+    "images": "截图和照片",
+    "pdf": "PDF 文档",
+    "docs": "文档和笔记",
+    "code": "源代码和配置文件",
+    "media": "音频和视频",
+    "recent": "最近一周修改过",
+    "errors": "搜索错误信息",
+    "diagrams": "搜索图表",
+    "dupes": "查找重复的文件和图片",
+    "reindex": "重新扫描监视的文件夹",
+    "doctor": "索引健康报告",
+    "settings": "打开设置"
   },
   "contextMenu": {
     "open": "打开",

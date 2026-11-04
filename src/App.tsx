@@ -33,6 +33,7 @@ import { ResultControls } from "./components/ResultControls";
 import { VirtualGrid } from "./components/VirtualGrid";
 import { FileRow } from "./components/FileRow";
 import { normalizeTheme } from "./hooks/useTheme";
+import { useLanguage } from "./hooks/useLanguage";
 import { PreviewDialog } from "./components/PreviewDialog";
 import { classify } from "./lib/categories";
 import { inFilter } from "./lib/query";
@@ -73,6 +74,11 @@ function putSnippet(
 
 function App() {
   const { t } = useTranslation("search");
+  const { t: tc } = useTranslation("common");
+  const { t: te } = useTranslation("errors");
+  /* Apply the persisted/auto language once at the root. Settings has its own
+     picker; this keeps startup and every later window in the same language. */
+  useLanguage();
   const [isSetupComplete, setIsSetupComplete] = useState<boolean | null>(null);
   const [query, setQuery] = useState("");
 
@@ -615,11 +621,11 @@ function App() {
   const handleCopyPath = useCallback(
     (path: string) => {
       navigator.clipboard.writeText(path).then(
-        () => flash("Path copied"),
-        () => flash("Couldn't copy the path"),
+        () => flash(t("toast.pathCopied")),
+        () => flash(te("copyPath")),
       );
     },
-    [flash],
+    [flash, t, te],
   );
 
 
@@ -631,20 +637,20 @@ function App() {
       inputRef.current?.focus();
     };
     return [
-      { id: "images", name: "images", label: "type:image", description: "Screenshots and photos", icon: ImageIcon, run: () => focus("type:image ") },
-      { id: "pdf", name: "pdf", label: "ext:pdf", description: "PDF documents", icon: FileText, run: () => focus("ext:pdf ") },
-      { id: "docs", name: "docs", label: "type:doc", description: "Documents and notes", icon: FileText, run: () => focus("type:doc ") },
-      { id: "code", name: "code", label: "type:code", description: "Source and config files", icon: FileCode, run: () => focus("type:code ") },
-      { id: "media", name: "media", label: "type:media", description: "Audio and video", icon: Film, run: () => focus("type:media ") },
-      { id: "recent", name: "recent", label: "modified:<7d", description: "Changed in the last week", icon: Clock, run: () => focus("modified:<7d ") },
-      { id: "errors", name: "errors", label: "error", description: "Search for error text", icon: TriangleAlert, run: () => focus("error ") },
-      { id: "diagrams", name: "diagrams", label: "diagram", description: "Search for diagrams", icon: FileCode, run: () => focus("diagram ") },
-      { id: "dupes", name: "dupes", label: "review", description: "Find duplicate files and images", icon: Copy, run: () => { setQuery(""); setShowDuplicates(true); } },
-      { id: "reindex", name: "reindex", label: "action", description: "Re-scan watched folders", icon: RefreshCw, run: () => { setQuery(""); handleRunCommand("/reindex"); } },
-      { id: "doctor", name: "doctor", label: "action", description: "Index health report", icon: Stethoscope, run: () => { setQuery(""); handleRunCommand("/doctor"); } },
-      { id: "settings", name: "settings", label: "⌘,", description: "Open Settings", icon: SettingsIcon, run: () => { setQuery(""); openSettings(); } },
+      { id: "images", name: "images", label: "type:image", description: t("slash.images"), icon: ImageIcon, run: () => focus("type:image ") },
+      { id: "pdf", name: "pdf", label: "ext:pdf", description: t("slash.pdf"), icon: FileText, run: () => focus("ext:pdf ") },
+      { id: "docs", name: "docs", label: "type:doc", description: t("slash.docs"), icon: FileText, run: () => focus("type:doc ") },
+      { id: "code", name: "code", label: "type:code", description: t("slash.code"), icon: FileCode, run: () => focus("type:code ") },
+      { id: "media", name: "media", label: "type:media", description: t("slash.media"), icon: Film, run: () => focus("type:media ") },
+      { id: "recent", name: "recent", label: "modified:<7d", description: t("slash.recent"), icon: Clock, run: () => focus("modified:<7d ") },
+      { id: "errors", name: "errors", label: "error", description: t("slash.errors"), icon: TriangleAlert, run: () => focus("error ") },
+      { id: "diagrams", name: "diagrams", label: "diagram", description: t("slash.diagrams"), icon: FileCode, run: () => focus("diagram ") },
+      { id: "dupes", name: "dupes", label: "review", description: t("slash.dupes"), icon: Copy, run: () => { setQuery(""); setShowDuplicates(true); } },
+      { id: "reindex", name: "reindex", label: "action", description: t("slash.reindex"), icon: RefreshCw, run: () => { setQuery(""); handleRunCommand("/reindex"); } },
+      { id: "doctor", name: "doctor", label: "action", description: t("slash.doctor"), icon: Stethoscope, run: () => { setQuery(""); handleRunCommand("/doctor"); } },
+      { id: "settings", name: "settings", label: "⌘,", description: t("slash.settings"), icon: SettingsIcon, run: () => { setQuery(""); openSettings(); } },
     ];
-  }, [handleRunCommand, openSettings]);
+  }, [handleRunCommand, openSettings, t]);
 
   const trimmedQuery = query.trim();
   const slashFilter = trimmedQuery.startsWith("/") ? trimmedQuery.slice(1).trim().toLowerCase() : null;
@@ -1061,7 +1067,7 @@ function App() {
                 trailing={
                   <button
                     type="button"
-                    title="Settings"
+                    title={t("settingsTitle")}
                     onClick={() => openSettings()}
                     className="btn btn-ghost btn-icon h-9 w-9"
                   >
@@ -1080,12 +1086,12 @@ function App() {
 
               {!isCommandMode && interpretation.length > 0 && (
                 <div className="flex shrink-0 flex-wrap items-center gap-1.5 px-3.5 pb-1.5">
-                  <span className="t-meta mr-1 text-subtle">Understood as</span>
+                  <span className="t-meta mr-1 text-subtle">{t("understoodAs")}</span>
                   {interpretation.map((c, i) => (
                     <button
                       key={`${c.raw}-${i}`}
                       type="button"
-                      title={`Remove “${c.source}”`}
+                      title={t("removeInterpretation", { source: c.source })}
                       onClick={() =>
                         setQuery((prev) =>
                           prev.replace(c.source, "").replace(/\s+/g, " ").trim(),
@@ -1131,7 +1137,7 @@ function App() {
                   <input
                     autoFocus
                     value={saveName}
-                    placeholder="Name this search"
+                    placeholder={t("saveName")}
                     onChange={(e) => setSaveName(e.target.value)}
                     onKeyDown={async (e) => {
                       if (e.key !== "Enter") return;
@@ -1174,7 +1180,7 @@ function App() {
                     }}
                     className="btn btn-primary h-8"
                   >
-                    Save
+                    {tc("actions.save")}
                   </button>
                 </div>
               )}
@@ -1264,21 +1270,21 @@ function App() {
                   ) : hasQuery ? (noResults ? (
                     <div className="flex h-full flex-col items-start justify-end gap-4 px-4 pb-8 select-none">
                       <p className="t-moment rise-in max-w-lg text-muted">
-                        Nothing called <span className="text-fg">{query.trim()}</span>, yet.
+                        {t("noResultsNothing", { query: query.trim() })}
                       </p>
                       <div className="flex flex-wrap items-center gap-1.5">
                         {hasActiveFilters(query) && (
-                          <SuggestChip label="Remove filters" onClick={() => setQuery("")} />
+                          <SuggestChip label={t("removeFilters")} onClick={() => setQuery("")} />
                         )}
                         <SuggestChip
-                          label="Try type:pdf"
+                          label={t("tryPdf")}
                           onClick={() => {
                             setQuery("type:pdf");
                             inputRef.current?.focus();
                           }}
                         />
                         <SuggestChip
-                          label="Nothing but folders"
+                          label={t("onlyFolders")}
                           onClick={() => {
                             setQuery("type:dir");
                             inputRef.current?.focus();

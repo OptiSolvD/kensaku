@@ -18,8 +18,6 @@ interface SearchBarProps {
   trailing?: React.ReactNode;
 }
 
-const PLACEHOLDERS = ["Search everything", "invoice from last week", "type:pdf in:~/Projects", "screenshots with a chart"];
-
 export function SearchBar({
   query,
   setQuery,
@@ -35,15 +33,22 @@ export function SearchBar({
   const { t } = useTranslation("search");
   const { t: tc } = useTranslation("common");
 
+  const placeholders = [
+    t("placeholders.everything"),
+    t("placeholders.invoice"),
+    t("placeholders.pdf"),
+    t("placeholders.chart"),
+  ];
+
   useEffect(() => {
     rotateRef.current = query === "";
     if (!query) {
       const id = window.setInterval(() => {
-        if (rotateRef.current) setPhIdx((i) => (i + 1) % PLACEHOLDERS.length);
+        if (rotateRef.current) setPhIdx((i) => (i + 1) % placeholders.length);
       }, 5000);
       return () => window.clearInterval(id);
     }
-  }, [query]);
+  }, [query, placeholders.length]);
 
   const isCommandMode = query.startsWith(">") || query.startsWith("/");
   const count = total && total > resultCount ? total : resultCount;
@@ -61,7 +66,7 @@ export function SearchBar({
           autoComplete="off"
           autoFocus
           onChange={(e) => setQuery(e.target.value)}
-          placeholder={isCommandMode ? t("command") : PLACEHOLDERS[phIdx]}
+          placeholder={isCommandMode ? t("command") : placeholders[phIdx % placeholders.length]}
           onFocus={onFocusInput}
           aria-label={tc("actions.search")}
           className="min-w-0 flex-1 bg-transparent text-[19px] font-medium leading-none tracking-[-0.022em] text-fg outline-none placeholder:font-normal placeholder:text-subtle"

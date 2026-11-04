@@ -3,6 +3,12 @@
   "command": "Command",
   "clearInput": "Clear (Esc)",
   "placeholderEmpty": "Type to search",
+  "placeholders": {
+    "everything": "Search everything",
+    "invoice": "invoice from last week",
+    "pdf": "type:pdf in:~/Projects",
+    "chart": "screenshots with a chart"
+  },
   "resultCount": "{{count}} results",
   "resultCount_one": "{{count}} result",
   "resultCount_other": "{{count}} results",
@@ -26,6 +32,16 @@
     "listShort": "List"
   },
   "saveSearch": "Save this search",
+  "saveName": "Name this search",
+  "understoodAs": "Understood as",
+  "removeInterpretation": "Remove “{{source}}”",
+  "removeFilter": "Remove filter {{filter}}",
+  "removeFilters": "Remove filters",
+  "tryPdf": "Try type:pdf",
+  "onlyFolders": "Nothing but folders",
+  "noResultsNothing": "Nothing called {{query}}, yet.",
+  "settingsTitle": "Settings",
+  "toast": { "pathCopied": "Path copied" },
   "filters": {
     "type": "Type",
     "ext": "Extension",
@@ -42,6 +58,20 @@
     "settings": "Settings",
     "reindex": "Reindex",
     "recent": "Recent queries"
+  },
+  "slash": {
+    "images": "Screenshots and photos",
+    "pdf": "PDF documents",
+    "docs": "Documents and notes",
+    "code": "Source and config files",
+    "media": "Audio and video",
+    "recent": "Changed in the last week",
+    "errors": "Search for error text",
+    "diagrams": "Search for diagrams",
+    "dupes": "Find duplicate files and images",
+    "reindex": "Re-scan watched folders",
+    "doctor": "Index health report",
+    "settings": "Open Settings"
   },
   "contextMenu": {
     "open": "Open",

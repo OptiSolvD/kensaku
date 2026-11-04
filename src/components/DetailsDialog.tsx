@@ -1,4 +1,6 @@
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { SearchResult } from "../types";
 import { formatBytes, formatRelativeTime } from "../lib/format";
 
@@ -13,6 +15,7 @@ export function DetailsDialog({
   result: SearchResult;
   onClose: () => void;
 }) {
+  const { t } = useTranslation("details");
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -25,11 +28,11 @@ export function DetailsDialog({
   }, [onClose]);
 
   const rows: [string, string][] = [
-    ["Location", result.path],
-    ["Size", formatBytes(result.file_size)],
-    ["Modified", formatRelativeTime(result.modified)],
-    ["Matched by", matchLabel(result.match_type)],
-    ["Score", result.score.toFixed(2)],
+    [t("location"), result.path],
+    [t("size"), formatBytes(result.file_size)],
+    [t("modified"), formatRelativeTime(result.modified)],
+    [t("matchedBy"), matchLabel(result.match_type, t)],
+    [t("score"), result.score.toFixed(2)],
   ];
 
   return (
@@ -41,7 +44,7 @@ export function DetailsDialog({
     >
       <div
         role="dialog"
-        aria-label="Details"
+        aria-label={t("title")}
         className="elevated overlay-in w-full max-w-[440px] rounded-sheet p-6"
       >
         <p className="t-title break-words text-fg">{result.filename}</p>
@@ -61,7 +64,7 @@ export function DetailsDialog({
             onClick={onClose}
             className="btn btn-primary h-9 px-5"
           >
-            Done
+            {t("done")}
           </button>
         </div>
       </div>
@@ -69,18 +72,21 @@ export function DetailsDialog({
   );
 }
 
-function matchLabel(matchType: SearchResult["match_type"]): string {
+function matchLabel(
+  matchType: SearchResult["match_type"],
+  t: TFunction<"details">,
+): string {
   switch (matchType) {
     case "FileName":
-      return "file name";
+      return t("match.fileName");
     case "Content":
-      return "file content";
+      return t("match.content");
     case "ContentFolded":
-      return "content (fuzzy)";
+      return t("match.contentFolded");
     case "Semantic":
-      return "meaning";
+      return t("match.semantic");
     case "Both":
-      return "name and content";
+      return t("match.both");
     default:
       return String(matchType);
   }

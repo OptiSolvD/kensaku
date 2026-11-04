@@ -9,7 +9,7 @@ import { TypeTile } from "./TypeTile";
    last, as tiles. Saved searches sit on one quiet line above. With nothing
    recent, a single serif line and a few starting searches. */
 
-const SUGGESTIONS = ["latest resume", "screenshots from last week", "big videos", "invoice"];
+
 
 function RecentTile({
   item,
@@ -83,13 +83,19 @@ export function HomeView({
   const { t } = useTranslation("home");
   const recent = data.recent.slice(0, 18);
   const saved = data.saved_searches ?? [];
+  const suggestions = [
+    t("suggestions.resume"),
+    t("suggestions.screenshots"),
+    t("suggestions.videos"),
+    t("suggestions.invoice"),
+  ];
 
   if (recent.length === 0) {
     return (
       <div className="flex flex-1 flex-col items-start justify-end gap-4 px-4 pb-8">
         <p className="t-moment rise-in max-w-md text-muted">{t("emptyHint")}</p>
         <div className="flex flex-wrap gap-1.5">
-          {SUGGESTIONS.map((q, i) => (
+          {suggestions.map((q, i) => (
             <button
               key={q}
               type="button"

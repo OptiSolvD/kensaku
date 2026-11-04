@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { useTranslation } from "react-i18next";
 import { Check, Copy } from "lucide-react";
 import { ModelsStatus } from "../../types";
 import { formatBytes } from "../../lib/format";
@@ -15,6 +16,7 @@ function mb(bytes: number): string {
 }
 
 export function ModelFilesCard() {
+  const { t } = useTranslation("settings");
   const [status, setStatus] = useState<ModelsStatus | null>(null);
   const [live, setLive] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -64,15 +66,15 @@ export function ModelFilesCard() {
     prog && prog.total > 0 ? Math.min(100, Math.round((prog.downloaded / prog.total) * 100)) : 0;
 
   return (
-    <Card title="Model files">
+    <Card title={t("models.title")}>
       {/* Directory */}
       {live && status?.dir && (
-        <Field label="Directory" description="Where the model files live on disk.">
+        <Field label={t("models.directory")} description={t("models.directoryDescription")}>
           <div className="flex min-w-0 items-center gap-1">
             <code className="max-w-56 truncate font-mono text-[11px] text-muted">{status.dir}</code>
             <button
               type="button"
-              title="Copy path"
+              title={t("models.copyPath")}
               onClick={copyDir}
               className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-subtle transition-colors hover:bg-accent-soft hover:text-fg"
             >
@@ -84,7 +86,7 @@ export function ModelFilesCard() {
 
       {/* Totals */}
       {live && (
-        <Field label="On disk" description="Bytes of the neural tier present / expected.">
+        <Field label={t("models.onDisk")} description={t("models.onDiskDescription")}>
           <span className="font-mono text-[11px] text-fg">
             {formatBytes(present)} / {formatBytes(expected)}
           </span>
@@ -111,7 +113,7 @@ export function ModelFilesCard() {
       {/* State (read-only — downloads live in setup). */}
       {!live ? (
         <p className="px-4 py-3.5 text-[12px] leading-[18px] text-muted">
-          Model status unavailable — the backend command is not connected yet.
+          {t("models.unavailable")}
         </p>
       ) : status?.downloading ? (
         <div className="space-y-2 border-t border-line px-4 py-3">
@@ -122,38 +124,36 @@ export function ModelFilesCard() {
             />
           </div>
           <div className="flex items-center justify-between gap-3 text-[11px]">
-            <code className="min-w-0 truncate font-mono text-muted">{prog?.file ?? "downloading…"}</code>
+            <code className="min-w-0 truncate font-mono text-muted">{prog?.file ?? t("models.downloading")}</code>
             <span className="shrink-0 font-mono text-fg">
               {mb(prog?.downloaded ?? 0)} / {mb(prog?.total || expected)} · {pct}%
             </span>
           </div>
-          <p className="font-mono text-[11px] text-subtle">downloading in setup…</p>
+          <p className="font-mono text-[11px] text-subtle">{t("models.downloadingSetup")}</p>
         </div>
       ) : status?.error ? (
         <div className="border-t border-line px-4 py-3">
           <p className="break-words text-[11px] text-danger">{status.error}</p>
           <p className="pt-1.5 text-[12px] leading-[18px] text-muted">
-            Use <b>About → Run setup again</b> to retry the download.
+            {t("models.retryHint")}
           </p>
         </div>
       ) : status?.ready ? (
         <div className="flex items-center gap-1.5 border-t border-line px-4 py-3">
           <span className="h-1.5 w-1.5 rounded-full bg-success" />
-          <p className="text-[12px] font-medium text-fg">Model files ready</p>
+          <p className="text-[12px] font-medium text-fg">{t("models.ready")}</p>
         </div>
       ) : (
         <div className="border-t border-line px-4 py-3">
           <p className="text-[12px] leading-[18px] text-muted">
-            Not downloaded. Use <b>About → Run setup again</b> to acquire the optional neural
-            tier.
+            {t("models.notDownloaded")}
           </p>
         </div>
       )}
 
       {/* Honest note. */}
       <p className="border-t border-line bg-accent-soft px-4 py-2.5 text-[12px] leading-[18px] text-muted">
-        The default semantic tier is built in. These files pre-fetch the optional neural tier for
-        offline use.
+        {t("models.note")}
       </p>
     </Card>
   );

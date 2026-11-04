@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { useTranslation } from "react-i18next";
 import { Check, Copy, Stethoscope } from "lucide-react";
 import { DoctorCheck, DoctorReport } from "../../types";
 import { Card } from "./kit";
@@ -11,7 +12,11 @@ import { Card } from "./kit";
 type Phase = "idle" | "running" | "done" | "error";
 
 const RANK: Record<DoctorCheck["status"], number> = { fail: 0, warn: 1, ok: 2 };
-const WORD: Record<DoctorCheck["status"], string> = { ok: "ok", warn: "warning", fail: "fail" };
+const WORD_KEY: Record<DoctorCheck["status"], "doctor.ok" | "doctor.warning" | "doctor.fail"> = {
+  ok: "doctor.ok",
+  warn: "doctor.warning",
+  fail: "doctor.fail",
+};
 const DOT: Record<DoctorCheck["status"], string> = {
   ok: "bg-success",
   warn: "bg-warning",
@@ -32,6 +37,7 @@ function sortChecks(checks: DoctorCheck[]): DoctorCheck[] {
 }
 
 export function DoctorSection() {
+  const { t } = useTranslation("settings");
   const [phase, setPhase] = useState<Phase>("idle");
   const [report, setReport] = useState<DoctorReport | null>(null);
   const [copied, setCopied] = useState(false);
@@ -89,7 +95,7 @@ export function DoctorSection() {
             className="btn btn-secondary h-8 px-3 text-[12px]"
           >
             {copied ? <Check className="h-3 w-3 text-accent" /> : <Copy className="h-3 w-3" />}
-            Copy report
+            {t("doctor.copyReport")}
           </button>
         )}
         <button
@@ -99,7 +105,7 @@ export function DoctorSection() {
           className="btn btn-primary h-8 px-4 text-[12px]"
         >
           <Stethoscope className="h-3 w-3" />
-          Run checks
+          {t("doctor.runChecks")}
         </button>
       </div>
 
@@ -109,17 +115,16 @@ export function DoctorSection() {
             <span className="flex h-9 w-9 items-center justify-center rounded-full border border-line bg-accent-soft text-subtle">
               <Stethoscope className="h-4 w-4" />
             </span>
-            <p className="text-[13px] font-medium text-fg">Nothing has been checked yet</p>
+            <p className="text-[13px] font-medium text-fg">{t("doctor.idleTitle")}</p>
             <p className="max-w-sm text-[12px] leading-[18px] text-muted">
-              A pass over the full-text index, the file watcher, the metadata database and the
-              model files. Everything runs on your machine — nothing is sent anywhere.
+              {t("doctor.idleDescription")}
             </p>
           </div>
         </Card>
       )}
 
       {phase === "running" && (
-        <Card title="Running">
+        <Card title={t("doctor.running")}>
           <div className="space-y-0">
             {[0, 1, 2, 3].map((i) => (
               <div key={i} className="flex items-center gap-3 border-b border-line px-4 py-2.5 last:border-b-0">
@@ -137,10 +142,9 @@ export function DoctorSection() {
 
       {phase === "error" && (
         <div className="overflow-hidden rounded-panel border border-danger/30 bg-elevated">
-          <p className="p-4 text-[12px] font-medium text-danger">Doctor unavailable — backend not connected</p>
+          <p className="p-4 text-[12px] font-medium text-danger">{t("doctor.unavailableTitle")}</p>
           <p className="px-4 pb-3 text-[12px] leading-[18px] text-muted">
-            The <code className="font-mono">run_doctor</code> command did not answer. It should
-            appear once the backend lands; the checks stay local and read-only.
+            {t("doctor.unavailableDescription")}
           </p>
         </div>
       )}
@@ -150,13 +154,15 @@ export function DoctorSection() {
           {/* Summary line with semantic-colored counts. */}
           <div className="flex items-center justify-between gap-4 border-b border-line bg-accent-soft px-4 py-2.5">
             <p className="text-[12px] text-muted">
-              {total} checks ·{" "}
-              <span className="text-success">{summary.ok} ok</span> ·{" "}
-              <span className="text-warning">{summary.warn} warning{summary.warn === 1 ? "" : "s"}</span>
+              {t("doctor.totalChecks", { total })} ·{" "}
+              <span className="text-success">{t("doctor.okCount", { count: summary.ok })}</span> ·{" "}
+              <span className="text-warning">
+                {t("doctor.warnCount", { count: summary.warn })}
+              </span>
               {summary.fail > 0 && (
                 <>
                   {" · "}
-                  <span className="text-danger">{summary.fail} fail{summary.fail === 1 ? "" : "s"}</span>
+                  <span className="text-danger">{t("doctor.failCount", { count: summary.fail })}</span>
                 </>
               )}
             </p>
@@ -182,7 +188,7 @@ export function DoctorSection() {
                     </code>
                     <button
                       type="button"
-                      title="Copy fix"
+                      title={t("doctor.copyFix")}
                       onClick={() => copyFix(c.id, c.fix ?? "")}
                       className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded text-subtle transition-colors hover:bg-accent-soft hover:text-fg"
                     >
@@ -196,7 +202,7 @@ export function DoctorSection() {
                 )}
               </div>
               <span className={`shrink-0 text-[11px] font-medium ${TONE[c.status]}`}>
-                {WORD[c.status]}
+                {t(WORD_KEY[c.status])}
               </span>
             </div>
           ))}

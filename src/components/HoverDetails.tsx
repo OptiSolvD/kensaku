@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { useTranslation } from "react-i18next";
 import { formatBytes, formatRelativeTime } from "../lib/format";
 import type { SearchResult } from "../types";
 
@@ -14,6 +15,7 @@ interface Details {
 }
 
 export function HoverDetails({ result }: { result: SearchResult }) {
+  const { t } = useTranslation("results");
   const [details, setDetails] = useState<Details>({});
 
   useEffect(() => {
@@ -30,7 +32,7 @@ export function HoverDetails({ result }: { result: SearchResult }) {
   }, [result.path, result.is_dir]);
 
   const parts = [
-    result.is_dir ? "Folder" : formatBytes(result.file_size),
+    result.is_dir ? t("hover.folder") : formatBytes(result.file_size),
     details.width && details.height ? `${details.width}×${details.height}` : null,
     formatRelativeTime(result.modified),
   ].filter(Boolean) as string[];

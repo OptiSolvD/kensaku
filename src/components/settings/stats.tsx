@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { useTranslation } from "react-i18next";
 import { Check, Copy } from "lucide-react";
 import { useStats } from "../../hooks/useStats";
 import { Sparkline } from "../Sparkline";
@@ -47,6 +48,7 @@ function Dot({ ok, label }: { ok: boolean; label: string }) {
 }
 
 export function StatsForNerds() {
+  const { t } = useTranslation("settings");
   const { stats, live } = useStats(2000);
   const [copied, setCopied] = useState(false);
   const [rebuilding, setRebuilding] = useState(false);
@@ -75,13 +77,7 @@ export function StatsForNerds() {
     <div>
       <div className="mb-3 flex items-center justify-between">
         <p className="text-[11px] text-subtle">
-          {live ? (
-            <>
-              polled from <code className="font-mono text-accent">get_stats</code> every 2 s
-            </>
-          ) : (
-            "waiting for get_stats — showing zeroed placeholders"
-          )}
+          {live ? t("stats.polled") : t("stats.waiting")}
         </p>
         <button
           type="button"
@@ -89,18 +85,13 @@ export function StatsForNerds() {
           className="btn btn-secondary h-8 px-3 text-[12px]"
         >
           {copied ? <Check className="h-3 w-3 text-accent" /> : <Copy className="h-3 w-3" />}
-          Copy diagnostics
+          {t("stats.copyDiagnostics")}
         </button>
         <button
           type="button"
           disabled={busy}
           onClick={async () => {
-            if (
-              !window.confirm(
-                "Rebuild the index from scratch? Kensaku clears the full-text index, semantic units and thumbnails, then rescans your folders.",
-              )
-            )
-              return;
+            if (!window.confirm(t("stats.rebuildConfirm"))) return;
             setRebuilding(true);
             try {
               // Resolves as soon as the in-process rebuild starts; progress
@@ -108,19 +99,19 @@ export function StatsForNerds() {
               await invoke("rebuild_index");
             } catch (err) {
               console.error("Rebuild failed:", err);
-              alert("Rebuild failed: " + err);
+              alert(t("stats.rebuildFailed", { error: String(err) }));
             } finally {
               setRebuilding(false);
             }
           }}
           className="btn btn-secondary h-8 px-3 text-[12px]"
         >
-          {rebuilding ? "Rebuilding…" : ing.is_indexing ? "Indexing…" : "Rebuild index"}
+          {rebuilding ? t("stats.rebuilding") : ing.is_indexing ? t("stats.indexing") : t("stats.rebuild")}
         </button>
       </div>
 
       {/* Latency */}
-      <Card title="Query latency">
+      <Card title={t("stats.latency")}>
         <div className="flex items-center gap-5 px-4 py-3.5">
           <div className="grid flex-1 grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
             <StatNumber value={q.p50_ms.toFixed(1)} suffix="ms" caption="p50" />
@@ -135,46 +126,48 @@ export function StatsForNerds() {
               value={q.last_ms.toFixed(1)}
               suffix="ms"
               tone={latencyToken(q.last_ms)}
-              caption="last"
+              caption={t("stats.last")}
             />
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1.5">
             <Sparkline values={q.history} width={110} height={36} />
             <span className="font-mono text-[11px] text-subtle">
-              {formatComma(q.total)} queries
+              {t("stats.queries", { count: formatComma(q.total) })}
             </span>
           </div>
         </div>
       </Card>
 
       {/* Index composition */}
-      <Card title="Index composition">
+      <Card title={t("stats.composition")}>
         <div className="grid grid-cols-2 gap-x-6 px-4 py-3 sm:grid-cols-4">
-          <StatNumber value={formatComma(i.files)} caption="files" />
-          <StatNumber value={formatComma(i.dirs)} caption="folders" />
-          <StatNumber value={formatComma(i.content_docs)} caption="content docs" />
-          <StatNumber value={formatComma(i.semantic_units)} caption="semantic units" />
+          <StatNumber value={formatComma(i.files)} caption={t("stats.files")} />
+          <StatNumber value={formatComma(i.dirs)} caption={t("stats.folders")} />
+          <StatNumber value={formatComma(i.content_docs)} caption={t("stats.contentDocs")} />
+          <StatNumber value={formatComma(i.semantic_units)} caption={t("stats.semanticUnits")} />
         </div>
         <div className="border-t border-line">
-          <Field label="Tantivy (full-text)" description="BM25 postings + fast fields.">
+          <Field label={t("stats.tantivy")} description={t("stats.tantivyDescription")}>
             <span className="font-mono text-[11px] text-fg">{formatBytes(i.tantivy_bytes)}</span>
           </Field>
-          <Field label="Vectors (i8)" description="Static embedding tier.">
+          <Field label={t("stats.vectors")} description={t("stats.vectorsDescription")}>
             <span className="font-mono text-[11px] text-fg">{formatBytes(i.vector_bytes)}</span>
           </Field>
-          <Field label="Metadata (SQLite WAL)" description="Durable truth, mmap snapshot.">
+          <Field label={t("stats.metadata")} description={t("stats.metadataDescription")}>
             <span className="font-mono text-[11px] text-fg">{formatBytes(i.metadata_db_bytes)}</span>
           </Field>
-          <Field label="Last reconcile" description="How fresh the index is, right now.">
+          <Field label={t("stats.lastReconcile")} description={t("stats.lastReconcileDescription")}>
             <span className="font-mono text-[11px] text-fg">
-              {i.last_reconcile_secs_ago == null ? "—" : `${Math.round(i.last_reconcile_secs_ago)} s ago`}
+              {i.last_reconcile_secs_ago == null
+                ? "—"
+                : t("stats.secondsAgo", { seconds: Math.round(i.last_reconcile_secs_ago) })}
             </span>
           </Field>
         </div>
       </Card>
 
       {/* Ingestion */}
-      <Card title="Ingestion">
+      <Card title={t("stats.ingestion")}>
         <div className="px-4 py-3.5">
           <div className="flex items-center justify-between gap-4 pb-2">
             <div className="flex items-center gap-2">
@@ -184,13 +177,15 @@ export function StatsForNerds() {
                 }`}
               />
               <span className="font-mono text-[12px] text-fg">
-                {ing.phase === "walking" && (ing.files_indexed ?? 0) === 0 ? "verifying" : ing.phase}
+                {ing.phase === "walking" && (ing.files_indexed ?? 0) === 0
+                  ? t("stats.verifying")
+                  : ing.phase}
               </span>
-              {!live && <Badge>placeholder</Badge>}
+              {!live && <Badge>{t("stats.placeholder")}</Badge>}
             </div>
             <span className="font-mono text-[11px] text-subtle">
-              {ing.files_per_sec > 0 ? `${formatComma(Math.round(ing.files_per_sec))} f/s` : "idle"}
-              {ing.eta_secs != null && ing.eta_secs > 0 && ` · eta ${formatDuration(ing.eta_secs)}`}
+              {ing.files_per_sec > 0 ? `${formatComma(Math.round(ing.files_per_sec))} f/s` : t("stats.idle")}
+              {ing.eta_secs != null && ing.eta_secs > 0 && ` · ${t("stats.eta", { time: formatDuration(ing.eta_secs) })}`}
             </span>
           </div>
           {/* Indeterminate when no total is known; depth signals backlog. */}
@@ -201,28 +196,25 @@ export function StatsForNerds() {
             />
           </div>
           <div className="flex gap-6 pt-3">
-            <StatNumber value={formatComma(ing.files_indexed)} caption="files indexed" />
-            <StatNumber value={formatComma(ing.content_indexed)} caption="content extracted" />
-            <StatNumber value={formatComma(ing.units_indexed)} caption="units embedded" />
-            <StatNumber value={formatComma(ing.embed_queue_depth)} caption="embed queue" />
+            <StatNumber value={formatComma(ing.files_indexed)} caption={t("stats.filesIndexed")} />
+            <StatNumber value={formatComma(ing.content_indexed)} caption={t("stats.contentExtracted")} />
+            <StatNumber value={formatComma(ing.units_indexed)} caption={t("stats.unitsEmbedded")} />
+            <StatNumber value={formatComma(ing.embed_queue_depth)} caption={t("stats.embedQueue")} />
           </div>
         </div>
       </Card>
 
       {/* Runtime */}
-      <Card title="Runtime">
+      <Card title={t("stats.runtime")}>
         <div className="grid grid-cols-2 gap-x-6 px-4 py-3 sm:grid-cols-3">
-          <StatNumber value={formatDuration(rt.uptime_secs)} caption="daemon uptime" />
-          <StatNumber value={formatBytes(rt.rss_bytes)} caption="rss memory" />
-          <StatNumber
-            value={rt.model_id || "—"}
-            caption="semantic model"
-          />
+          <StatNumber value={formatDuration(rt.uptime_secs)} caption={t("stats.uptime")} />
+          <StatNumber value={formatBytes(rt.rss_bytes)} caption={t("stats.rss")} />
+          <StatNumber value={rt.model_id || "—"} caption={t("stats.semanticModel")} />
         </div>
         <div className="flex gap-5 border-t border-line px-4 py-2.5">
-          <Dot ok={rt.watcher_ok} label="watcher" />
-          <Dot ok={rt.semantic_ready} label="semantic ready" />
-          <Dot ok={live} label="live telemetry" />
+          <Dot ok={rt.watcher_ok} label={t("stats.watcher")} />
+          <Dot ok={rt.semantic_ready} label={t("stats.semanticReady")} />
+          <Dot ok={live} label={t("stats.liveTelemetry")} />
         </div>
       </Card>
     </div>

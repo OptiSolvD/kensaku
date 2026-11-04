@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { useTranslation } from "react-i18next";
 import { Copy, FolderOpen, LoaderCircle, X } from "lucide-react";
 import type { DuplicateGroup } from "../types";
 
@@ -9,6 +10,7 @@ import type { DuplicateGroup } from "../types";
    deliberately left to the OS/file manager. */
 
 export function DuplicatesModal({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation("results");
   const [groups, setGroups] = useState<DuplicateGroup[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
@@ -59,20 +61,25 @@ export function DuplicatesModal({ onClose }: { onClose: () => void }) {
     }
   };
 
+  const kindLabel = (kind: string) => {
+    if (kind === "burst") return t("duplicates.kindBurst");
+    if (kind === "content") return t("duplicates.kindExact");
+    if (kind === "image") return t("duplicates.kindPerceptual");
+    return kind;
+  };
+
   return (
     <div className="absolute inset-0 z-50 flex flex-col bg-bg">
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-line px-5">
         <div>
-          <h1 className="text-[15px] font-semibold tracking-tight text-fg">Duplicates</h1>
-          <p className="text-[12px] text-muted">
-            Exact-content matches and near-identical images. Review only — delete in your file manager.
-          </p>
+          <h1 className="text-[15px] font-semibold tracking-tight text-fg">{t("duplicates.title")}</h1>
+          <p className="text-[12px] text-muted">{t("duplicates.subtitle")}</p>
         </div>
         <button
           type="button"
           onClick={onClose}
           className="flex h-8 w-8 items-center justify-center rounded-control text-muted transition-colors hover:bg-accent-soft hover:text-fg"
-          title="Close"
+          title={t("duplicates.close")}
         >
           <X className="h-4 w-4" />
         </button>
@@ -82,16 +89,14 @@ export function DuplicatesModal({ onClose }: { onClose: () => void }) {
         {groups === null ? (
           <div className="flex h-full items-center justify-center gap-2 text-[12px] text-muted">
             <LoaderCircle className="h-4 w-4 animate-spin" />
-            Finding duplicates…
+            {t("duplicates.finding")}
           </div>
         ) : error ? (
-          <p className="text-[12px] text-danger">{error}</p>
+          <p className="text-[12px] text-danger">{t("duplicates.loadFailed", { error })}</p>
         ) : groups.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-1 text-center">
-            <p className="text-[13px] font-medium text-fg">No duplicates found.</p>
-            <p className="text-[12px] text-muted">
-              Exact-content, screenshot-burst, and perceptual-image duplicates will appear here.
-            </p>
+            <p className="text-[13px] font-medium text-fg">{t("duplicates.none")}</p>
+            <p className="text-[12px] text-muted">{t("duplicates.noneHint")}</p>
           </div>
         ) : (
           <div className="mx-auto max-w-3xl space-y-3">
@@ -100,10 +105,10 @@ export function DuplicatesModal({ onClose }: { onClose: () => void }) {
                 <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-2.5">
                   <div className="flex items-center gap-2">
                     <span className="rounded-full bg-accent-soft px-2 py-0.5 font-mono text-[11px] text-muted">
-                      {g.kind === "burst" ? "screenshot burst" : g.kind}
+                      {kindLabel(g.kind)}
                     </span>
                     <span className="text-[12px] font-medium text-fg">
-                      {g.paths.length} files
+                      {t("duplicates.files", { count: g.paths.length })}
                     </span>
                   </div>
                   <code className="truncate font-mono text-[11px] text-subtle">{g.hash}</code>
@@ -117,7 +122,7 @@ export function DuplicatesModal({ onClose }: { onClose: () => void }) {
                       <button
                         type="button"
                         onClick={() => open(p)}
-                        title="Open file"
+                        title={t("duplicates.openFile")}
                         className="min-w-0 flex-1 truncate text-left font-mono text-[11px] text-fg transition-colors hover:text-accent"
                       >
                         {p}
@@ -125,7 +130,7 @@ export function DuplicatesModal({ onClose }: { onClose: () => void }) {
                       <div className="flex shrink-0 items-center gap-1">
                         <button
                           type="button"
-                          title="Copy path"
+                          title={t("duplicates.copyPath")}
                           onClick={() => copy(p)}
                           className="flex h-6 w-6 items-center justify-center rounded text-subtle transition-colors hover:bg-accent-soft hover:text-fg"
                         >
@@ -133,7 +138,7 @@ export function DuplicatesModal({ onClose }: { onClose: () => void }) {
                         </button>
                         <button
                           type="button"
-                          title="Reveal in folder"
+                          title={t("duplicates.reveal")}
                           onClick={() => reveal(p)}
                           className="flex h-6 w-6 items-center justify-center rounded text-subtle transition-colors hover:bg-accent-soft hover:text-fg"
                         >
@@ -149,7 +154,7 @@ export function DuplicatesModal({ onClose }: { onClose: () => void }) {
         )}
         {copied && (
           <p className="fixed bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-fg px-3 py-1 font-mono text-[11px] text-bg">
-            copied
+            {t("duplicates.copied")}
           </p>
         )}
       </main>
