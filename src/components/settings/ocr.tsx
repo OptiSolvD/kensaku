@@ -9,6 +9,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { KensakuConfig, ModelsStatus, OcrEngine, OcrStatus } from "../../types";
+import { openGitHubBugReport } from "../../lib/githubIssue";
 import { formatBytes } from "../../lib/format";
 import { Switch } from "./kit";
 
@@ -181,6 +182,18 @@ export function OcrField({
           {packProblem ?? t("ocr.cannotRun", { name: packInfo.name })}
           {fallbackEngine ? t("ocr.usingFallback", { engine: fallbackEngine }) : ""}
         </span>
+        <button
+          type="button"
+          onClick={() =>
+            openGitHubBugReport({
+              title: `[bug] OCR ${packInfo.name} issue: ${packProblem ?? "cannot run"}`,
+              whatHappened: `OCR engine ${packInfo.name} failed with: ${packProblem ?? "cannot run"}`,
+            })
+          }
+          className="ml-1 text-[11px] text-accent underline hover:opacity-80"
+        >
+          {t("ocr.reportIssue")}
+        </button>
       </>
     )
   ) : engineMissing ? (

@@ -286,6 +286,31 @@ impl Engine {
                 }
             }
         }
+
+        // Fallback for lines that yielded no text from specialized recognizers:
+        // try the comprehensive base recognizer (`rec.onnx` + `vocab`) which includes
+        // full Cyrillic, Latin, Greek, math, and punctuation. This ensures misrouted
+        // or out-of-vocabulary scripts are never silently dropped.
+        let empty_lines: Vec<usize> = (0..crops.len())
+            .filter(|&j| best[j].0.trim().is_empty())
+            .collect();
+        if !empty_lines.is_empty() {
+            let src = if self.window > 1 { &tall } else { &crops };
+            let widths: Vec<usize> = empty_lines.iter().map(|&j| crops[j].w).collect();
+            for part in width_batches(&widths) {
+                let idx: Vec<usize> = part.iter().map(|&i| empty_lines[i]).collect();
+                let batch: Vec<&Crop> = idx.iter().map(|&j| &src[j]).collect();
+                for (j, (ids, conf)) in idx.iter().zip(run_ctc(&mut self.rec, &batch)?) {
+                    if conf >= MIN_CONF {
+                        let text = self.vocab.decode(&ids);
+                        if !text.trim().is_empty() && conf > best[*j].1 {
+                            best[*j] = (text, conf);
+                        }
+                    }
+                }
+            }
+        }
+
         Ok(best)
     }
 

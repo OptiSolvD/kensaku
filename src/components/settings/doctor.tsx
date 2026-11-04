@@ -1,7 +1,8 @@
 import { useCallback, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useTranslation } from "react-i18next";
-import { Check, Copy, Stethoscope } from "lucide-react";
+import { Bug, Check, Copy, Stethoscope } from "lucide-react";
+import { openGitHubBugReport } from "../../lib/githubIssue";
 import { DoctorCheck, DoctorReport } from "../../types";
 import { Card } from "./kit";
 
@@ -42,6 +43,7 @@ export function DoctorSection() {
   const [report, setReport] = useState<DoctorReport | null>(null);
   const [copied, setCopied] = useState(false);
   const [copiedFix, setCopiedFix] = useState<string | null>(null);
+  const [reported, setReported] = useState(false);
 
   const run = useCallback(() => {
     setPhase("running");
@@ -79,6 +81,16 @@ export function DoctorSection() {
     }
   }, []);
 
+  const handleReportGitHub = useCallback(async () => {
+    const { copied } = await openGitHubBugReport({ report });
+    if (copied) {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    }
+    setReported(true);
+    window.setTimeout(() => setReported(false), 2500);
+  }, [report]);
+
   const checks = report ? sortChecks(report.checks) : [];
   const summary = report?.summary ?? { ok: 0, warn: 0, fail: 0 };
   const total = summary.ok + summary.warn + summary.fail;
@@ -89,14 +101,25 @@ export function DoctorSection() {
           the description. */}
       <div className="mb-3 flex items-center justify-end gap-1.5">
         {report && phase !== "running" && (
-          <button
-            type="button"
-            onClick={copyReport}
-            className="btn btn-secondary h-8 px-3 text-[12px]"
-          >
-            {copied ? <Check className="h-3 w-3 text-accent" /> : <Copy className="h-3 w-3" />}
-            {t("doctor.copyReport")}
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={handleReportGitHub}
+              className="btn btn-secondary h-8 px-3 text-[12px]"
+              title={t("doctor.reportTooltip")}
+            >
+              <Bug className="h-3 w-3 text-danger" />
+              {reported ? t("doctor.reportOpened") : t("doctor.reportIssue")}
+            </button>
+            <button
+              type="button"
+              onClick={copyReport}
+              className="btn btn-secondary h-8 px-3 text-[12px]"
+            >
+              {copied ? <Check className="h-3 w-3 text-accent" /> : <Copy className="h-3 w-3" />}
+              {t("doctor.copyReport")}
+            </button>
+          </>
         )}
         <button
           type="button"
@@ -172,6 +195,22 @@ export function DoctorSection() {
               </p>
             )}
           </div>
+
+          {(summary.fail > 0 || summary.warn > 0) && (
+            <div className="flex items-center justify-between gap-3 border-b border-line bg-warning/5 px-4 py-2.5">
+              <p className="text-[12px] text-muted">
+                {t("doctor.hasIssuesNotice")}
+              </p>
+              <button
+                type="button"
+                onClick={handleReportGitHub}
+                className="btn btn-secondary h-7 shrink-0 px-2.5 text-[11px]"
+              >
+                <Bug className="h-3 w-3 text-warning" />
+                {t("doctor.reportIssue")}
+              </button>
+            </div>
+          )}
 
           {checks.map((c) => (
             <div key={c.id} className="flex gap-3 border-b border-line px-4 py-2.5 last:border-b-0">

@@ -585,38 +585,69 @@ fn check_ocr() -> DoctorCheck {
 
 fn check_ocr_pack() -> DoctorCheck {
     const ID: &str = "ocr_pack";
-    const LABEL: &str = "Accurate OCR pack";
-    let status = models::ocr_status();
-    let present = status.artifacts.iter().filter(|a| a.present).count();
-    let total = status.artifacts.len();
-    if status.ready {
-        match crate::ocr::accurate_problem() {
-            None => ok(
+    if crate::ocr::engine_name() == crate::ocr::INDRA {
+        const LABEL: &str = "Indra OCR pack";
+        let status = models::indra_status();
+        let present = status.artifacts.iter().filter(|a| a.present).count();
+        let total = status.artifacts.len();
+        if status.ready {
+            match crate::ocr_indra::problem() {
+                None => ok(
+                    ID,
+                    LABEL,
+                    format!(
+                        "installed ({}) and verified on a test image",
+                        format_bytes(status.total_present_bytes)
+                    ),
+                ),
+                Some(problem) => warn(ID, LABEL, format!("installed, but {problem}"), None),
+            }
+        } else {
+            warn(
                 ID,
                 LABEL,
                 format!(
-                    "installed ({}) and verified on a test image",
-                    format_bytes(status.total_present_bytes)
+                    "Indra OCR is selected but {} of {} artifacts are missing.",
+                    total - present,
+                    total
                 ),
-            ),
-            Some(problem) => warn(ID, LABEL, format!("installed, but {problem}"), None),
+                Some("Download the Indra OCR pack in Settings → Search".to_string()),
+            )
         }
     } else if crate::ocr::engine_name() == crate::ocr::ACCURATE {
-        warn(
-            ID,
-            LABEL,
-            format!(
-                "Accurate OCR is selected but {} of {} artifacts are missing.",
-                total - present,
-                total
-            ),
-            Some("Download the accurate OCR pack in Settings → Search".to_string()),
-        )
+        const LABEL: &str = "Accurate PP-OCR pack";
+        let status = models::ocr_status();
+        let present = status.artifacts.iter().filter(|a| a.present).count();
+        let total = status.artifacts.len();
+        if status.ready {
+            match crate::ocr::accurate_problem() {
+                None => ok(
+                    ID,
+                    LABEL,
+                    format!(
+                        "installed ({}) and verified on a test image",
+                        format_bytes(status.total_present_bytes)
+                    ),
+                ),
+                Some(problem) => warn(ID, LABEL, format!("installed, but {problem}"), None),
+            }
+        } else {
+            warn(
+                ID,
+                LABEL,
+                format!(
+                    "Accurate PP-OCR is selected but {} of {} artifacts are missing.",
+                    total - present,
+                    total
+                ),
+                Some("Download the accurate OCR pack in Settings → Search".to_string()),
+            )
+        }
     } else {
         ok(
             ID,
-            LABEL,
-            "Optional pack not installed; Tesseract is active.".to_string(),
+            "OCR pack",
+            "Tesseract engine is selected (no ONNX pack needed).".to_string(),
         )
     }
 }

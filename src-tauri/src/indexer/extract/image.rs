@@ -258,7 +258,27 @@ fn fallback_tesseract_paths() -> Vec<PathBuf> {
 }
 
 fn tesseract_command() -> Command {
-    let mut command = Command::new(tesseract_program());
+    let prog = tesseract_program();
+    let mut command = Command::new(&prog);
+    // On Linux AppImage, the child process inherits LD_LIBRARY_PATH pointing to AppImage's
+    // internal libraries, which breaks host system binaries like /usr/bin/tesseract.
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        if let Ok(orig) = std::env::var("LD_LIBRARY_PATH_ORIG") {
+            command.env("LD_LIBRARY_PATH", orig);
+        } else if let Ok(appdir) = std::env::var("APPDIR") {
+            if let Ok(current) = std::env::var("LD_LIBRARY_PATH") {
+                let cleaned: Vec<_> = std::env::split_paths(&current)
+                    .filter(|p| !p.starts_with(&appdir))
+                    .collect();
+                if cleaned.is_empty() {
+                    command.env_remove("LD_LIBRARY_PATH");
+                } else if let Ok(joined) = std::env::join_paths(cleaned) {
+                    command.env("LD_LIBRARY_PATH", joined);
+                }
+            }
+        }
+    }
     // Tesseract links OpenMP and, left alone, starts one thread per core in
     // every process. Kensaku already runs several OCR processes concurrently,
     // so that oversubscribes the CPU badly (a crawl with 8 workers behaved as
@@ -459,7 +479,17 @@ fn tesseract_has_language() -> bool {
             !parse_langs(&String::from_utf8_lossy(&output.stdout)).is_empty()
                 || !parse_langs(&String::from_utf8_lossy(&output.stderr)).is_empty()
         }
-        _ => false,
+        Ok(output) => {
+            let err = String::from_utf8_lossy(&output.stderr);
+            if !err.trim().is_empty() {
+                eprintln!("[Kensaku OCR] tesseract --list-langs failed: {}", err.trim());
+            }
+            false
+        }
+        Err(e) => {
+            eprintln!("[Kensaku OCR] failed to execute tesseract: {e}");
+            false
+        }
     }
 }
 

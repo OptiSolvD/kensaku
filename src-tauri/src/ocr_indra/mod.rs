@@ -54,7 +54,7 @@ pub fn problem() -> Option<String> {
         return Some("Indra OCR models are not downloaded yet".into());
     }
     if !crate::ocr::runtime_loadable() {
-        return crate::ocr::accurate_problem()
+        return crate::ocr::runtime_error()
             .or_else(|| Some("ONNX Runtime could not be loaded".into()));
     }
     self_test().err()
@@ -93,7 +93,7 @@ pub fn extract_decoded(image: &image::DynamicImage) -> OcrOutcome {
             Some(Ok(_)) => OcrOutcome::NoText,
             Some(Err(e)) => {
                 eprintln!("[Kensaku OCR] Indra failed on an image: {e}");
-                OcrOutcome::NoText
+                OcrOutcome::Unavailable
             }
         }
     }
@@ -126,17 +126,22 @@ pub fn self_test() -> Result<(), String> {
     }
     let result = image::load_from_memory(crate::ocr::SELF_TEST_IMAGE)
         .map_err(|e| format!("self-test image is unreadable: {e}"))
-        .and_then(|image| match extract_decoded(&image) {
-            OcrOutcome::Text(text) => {
-                let normalized = text.split_whitespace().collect::<Vec<_>>().join(" ");
-                if normalized.to_lowercase().contains(crate::ocr::SELF_TEST_EXPECTED) {
-                    Ok(())
-                } else {
-                    Err(format!("Indra misread its self-test: {normalized:?}"))
+        .and_then(|image| {
+            let page = imageops::Gray::from_image(&image);
+            match pool::read(&page) {
+                None => Err("Indra models failed to load".into()),
+                Some(Err(e)) => Err(format!("Indra engine failed during self-test: {e}")),
+                Some(Ok(text)) => {
+                    let normalized = text.split_whitespace().collect::<Vec<_>>().join(" ");
+                    if normalized.to_lowercase().contains(crate::ocr::SELF_TEST_EXPECTED) {
+                        Ok(())
+                    } else if normalized.is_empty() {
+                        Err("Indra read nothing in its self-test".into())
+                    } else {
+                        Err(format!("Indra misread its self-test: {normalized:?}"))
+                    }
                 }
             }
-            OcrOutcome::NoText => Err("Indra read nothing in its self-test".into()),
-            OcrOutcome::Unavailable => Err("Indra models failed to load".into()),
         });
     if let Err(reason) = &result {
         eprintln!("[Kensaku OCR] {reason}");

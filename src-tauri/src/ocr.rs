@@ -97,6 +97,21 @@ fn runtime_candidates(exe: &Path, file_name: &str) -> Vec<PathBuf> {
         dir.join("../lib/kensaku").join(file_name),
         dir.join("../lib").join(file_name),
     ];
+    // Development and test layouts:
+    // target/debug/deps -> target/debug
+    if let Some(parent) = dir.parent() {
+        candidates.push(parent.join(file_name));
+        // target/debug -> src-tauri
+        if let Some(grandparent) = parent.parent() {
+            candidates.push(grandparent.join(file_name));
+            // workspace root -> src-tauri
+            candidates.push(grandparent.join("src-tauri").join(file_name));
+        }
+    }
+    // Also check standard configuration and model directories
+    candidates.push(KensakuConfig::config_dir().join(file_name));
+    candidates.push(KensakuConfig::config_dir().join("models").join(file_name));
+
     // The standalone daemon (installed with the CLI, not inside the app) uses
     // the copy the installed app shipped.
     if cfg!(target_os = "macos") {
@@ -116,8 +131,8 @@ fn runtime_probe() -> &'static Result<String, String> {
     static PROBE: OnceLock<Result<String, String>> = OnceLock::new();
     PROBE.get_or_init(|| {
         let file_name = runtime_file_name();
-        let path = match std::env::var("ORT_DYLIB_PATH") {
-            Ok(path) if !path.trim().is_empty() => path,
+        let path_opt = match std::env::var("ORT_DYLIB_PATH") {
+            Ok(path) if !path.trim().is_empty() => Some(path),
             _ => std::env::current_exe()
                 .ok()
                 .and_then(|exe| {
@@ -125,8 +140,17 @@ fn runtime_probe() -> &'static Result<String, String> {
                         .into_iter()
                         .find(|candidate| candidate.is_file())
                 })
-                .map(|candidate| candidate.to_string_lossy().into_owned())
-                .unwrap_or_else(|| file_name.clone()),
+                .map(|candidate| candidate.to_string_lossy().into_owned()),
+        };
+        let path = match path_opt {
+            Some(p) => p,
+            None => {
+                let reason = format!(
+                    "ONNX Runtime library ({file_name}) not found. Place it next to kensaku or set ORT_DYLIB_PATH"
+                );
+                eprintln!("[Kensaku OCR] {reason}");
+                return Err(reason);
+            }
         };
         // `init_from` returns an error for a missing/incompatible library,
         // but guard against a panic from a broken loader anyway. `ort::api()`
@@ -154,6 +178,18 @@ fn runtime_probe() -> &'static Result<String, String> {
             }
         }
     })
+}
+
+/// Detailed error from the ONNX Runtime loader, if loading failed.
+pub fn runtime_error() -> Option<String> {
+    #[cfg(feature = "accurate-ocr")]
+    {
+        runtime_probe().as_ref().err().cloned()
+    }
+    #[cfg(not(feature = "accurate-ocr"))]
+    {
+        Some("accurate-ocr feature is not compiled in".to_string())
+    }
 }
 
 /// True when the dynamic ONNX Runtime library can be loaded. Probed once per
@@ -343,11 +379,11 @@ fn recognize(engine: &paddleocr_rs_onnx::OcrEngine, image: &image::DynamicImage)
         Ok(Ok(blocks)) => blocks,
         Ok(Err(e)) => {
             eprintln!("[Kensaku OCR] PP-OCR failed on an image: {e}");
-            return OcrOutcome::NoText;
+            return OcrOutcome::Unavailable;
         }
         Err(_) => {
             eprintln!("[Kensaku OCR] PP-OCR panicked on an image");
-            return OcrOutcome::NoText;
+            return OcrOutcome::Unavailable;
         }
     };
     let text = blocks
