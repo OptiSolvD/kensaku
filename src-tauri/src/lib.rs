@@ -49,8 +49,6 @@ fn instance_lock_path() -> PathBuf {
 /// * `Err(_)` — the lock file could not be created or opened. Startup continues
 ///   without the guard rather than bricking the app on a read-only config dir.
 fn acquire_instance_lock() -> Result<Option<std::fs::File>, String> {
-    use fs4::fs_std::FileExt;
-
     let dir = KensakuConfig::config_dir();
     std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {}", dir.display(), e))?;
 
@@ -63,10 +61,10 @@ fn acquire_instance_lock() -> Result<Option<std::fs::File>, String> {
         .open(&path)
         .map_err(|e| format!("{}: {}", path.display(), e))?;
 
-    match file.try_lock_exclusive() {
-        Ok(true) => Ok(Some(file)),
-        Ok(false) => Ok(None),
-        Err(e) => Err(format!("{}: {}", path.display(), e)),
+    match file.try_lock() {
+        Ok(()) => Ok(Some(file)),
+        Err(std::fs::TryLockError::WouldBlock) => Ok(None),
+        Err(std::fs::TryLockError::Error(e)) => Err(format!("{}: {}", path.display(), e)),
     }
 }
 

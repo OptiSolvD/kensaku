@@ -759,7 +759,12 @@ fn sha256_file(path: &Path) -> Result<String, String> {
     let bytes =
         std::fs::read(path).map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
     let digest = Sha256::digest(bytes);
-    Ok(format!("{:x}", digest))
+    let mut hex = String::with_capacity(digest.len() * 2);
+    for &byte in digest.as_slice() {
+        use std::fmt::Write as _;
+        let _ = write!(hex, "{:02x}", byte);
+    }
+    Ok(hex)
 }
 
 /// Removes every model artifact and resets progress/error state.

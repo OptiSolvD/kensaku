@@ -3,7 +3,7 @@ use crate::config::KensakuConfig;
 use crate::indexer::IndexingStatus;
 use crate::indexer::extract::image::{self, OcrStatus};
 use crate::search::{SearchDispatcher, SearchResponse, SearchResult};
-use auto_launch::AutoLaunch;
+use auto_launch::{AutoLaunch, AutoLaunchBuilder};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
@@ -1352,12 +1352,17 @@ fn autostart_handle() -> Result<AutoLaunch, String> {
         .to_str()
         .ok_or_else(|| "Kensaku executable path is not valid UTF-8".to_string())?;
 
-    // macOS supports two mechanisms; the per-user LaunchAgent (`true`) is the
-    // least intrusive and does not need AppleScript automation permissions.
-    #[cfg(target_os = "macos")]
-    let handle = AutoLaunch::new("Kensaku", exe, true, &[] as &[&str]);
-    #[cfg(not(target_os = "macos"))]
-    let handle = AutoLaunch::new("Kensaku", exe, &[] as &[&str]);
+    // The builder's defaults match the old platform-specific constructors,
+    // except Windows: 0.6 defaults to `Dynamic` (which tries HKLM first and
+    // can raise a UAC prompt), while the old constructor only wrote HKCU.
+    // Keep the current-user entry so enabling autostart stays prompt-free.
+    let handle = AutoLaunchBuilder::new()
+        .set_app_name("Kensaku")
+        .set_app_path(exe)
+        .set_windows_enable_mode(auto_launch::WindowsEnableMode::CurrentUser)
+        .set_args(&[] as &[&str])
+        .build()
+        .map_err(|e| format!("Could not configure autostart: {}", e))?;
 
     Ok(handle)
 }
