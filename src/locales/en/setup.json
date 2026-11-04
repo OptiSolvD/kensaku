@@ -9,7 +9,7 @@
   },
   "done": {
     "title": "Your files are ready.",
-    "pressShortcut": "Press {{shortcut}} from anywhere to search.",
+    "pressShortcut": "Press <kbd>{{shortcut}}</kbd> from anywhere to search.",
     "openFromTaskbar": "Kensaku is in your taskbar or Dock. Open it from there whenever you need it.",
     "closingNote": "Closing the window just hides Kensaku, it keeps running in the background. If it seems to disappear, press your shortcut or look in the tray.",
     "quitNote": "Closing the window quits Kensaku. Your index stays on disk, so the next launch is instant.",

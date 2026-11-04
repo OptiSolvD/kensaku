@@ -9,7 +9,7 @@
   },
   "done": {
     "title": "你的文件已就绪。",
-    "pressShortcut": "在任意位置按下 {{shortcut}} 即可搜索。",
+    "pressShortcut": "在任意位置按下 <kbd>{{shortcut}}</kbd> 即可搜索。",
     "openFromTaskbar": "Kensaku 已在任务栏或程序坞中。需要时从那里打开即可。",
     "closingNote": "关闭窗口只会隐藏 Kensaku，它仍会在后台运行。如果它似乎消失了，请按快捷键或查看托盘。",
     "quitNote": "关闭窗口将退出 Kensaku。索引仍保存在磁盘上，下次启动即可立即使用。",

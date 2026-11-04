@@ -1,7 +1,8 @@
 # Usage
 
-> This page documents **shipped behavior** at `v1.0.0`: plain-language intent,
-> `/` commands, `@` scopes, facet counts, and the optional visual beta.
+> This page documents **shipped behavior** in the current release: plain-language
+> intent, `/` commands, `@` scopes, facet counts, window modes, and the optional
+> visual beta.
 
 ## The window
 

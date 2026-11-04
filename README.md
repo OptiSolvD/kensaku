@@ -222,10 +222,11 @@ Full threat model: [SECURITY.md](SECURITY.md).
 
 ## Status
 
-**Shipping now (1.0.6)**
+**Shipping now (1.0.12)**
 
 - Desktop app for Windows, macOS, and Linux: light and dark themes, grid and list results, infinite scroll, thumbnails, hover details, right-click actions
-- True launcher behavior: hidden-to-tray start, global summon keystroke, memory trimmed while hidden
+- Two window modes: a normal desktop app (setup default) or a tray launcher with a global summon keystroke and memory trimmed while hidden
+- English and Simplified Chinese interface, auto-detected from the system or chosen in Settings
 - Recents ranked by what you actually opened, persisted across restarts
 - Search by name, content, meaning, and typo-tolerant matches
 - Documents, code, and images (with OCR), CJK-aware

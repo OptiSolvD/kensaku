@@ -78,7 +78,7 @@
   },
   "invocation": {
     "title": "唤起方式",
-    "shortcut": "快捷快捷键",
+    "shortcut": "唤起快捷键",
     "shortcutLauncher": "在任意位置按下即可打开搜索。点击后按下组合键即可更改。在 Linux Wayland 下桌面环境可能拦截全局快捷键：可将系统快捷键绑定到命令 kensaku --toggle。",
     "shortcutApp": "仅在启动器模式下使用；桌面应用从任务栏打开。",
     "pressKeys": "请按下按键…",
@@ -212,14 +212,14 @@
     "howTo": "如何使用 Kensaku",
     "howToIntro": "几个简单技巧让搜索更快：",
     "tipLabels": {
-    "tab": "Tab",
-    "aliases": "别名",
-    "filters": "筛选",
-    "sort": "排序",
-    "pin": "固定",
-    "ocr": "OCR"
-  },
-  "tipTab": "显示或隐藏结果旁的信息面板。",
+      "tab": "Tab",
+      "aliases": "别名",
+      "filters": "筛选",
+      "sort": "排序",
+      "pin": "固定",
+      "ocr": "OCR"
+    },
+    "tipTab": "显示或隐藏结果旁的信息面板。",
     "tipAliases": "让“简历”这样的词也能找到“cv”和“curriculum”。",
     "tipFilters": "例如 {{type}}、{{ext}}、{{in}} 和 {{modified}} 可缩小结果范围。",
     "tipSlash": "打开命令菜单快速执行操作，例如 {{dupes}}、{{doctor}} 和 {{settings}}。",
