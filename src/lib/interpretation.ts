@@ -63,7 +63,12 @@ export function interpretationLabel(
       if (key) return t("interpretation.time.lastWeekday", { weekday: t(key) });
     }
 
-    const daysAgo = /^Modified: (\d+) days ago$/i.exec(label);
+    // The backend renders this chip as "Modified: days ago N", so accept that
+    // shape (and the natural "Modified: N days ago" one) rather than leaving
+    // an English label in a translated UI.
+    const daysAgo =
+      /^Modified: days ago (\d+)$/i.exec(label) ??
+      /^Modified: (\d+) days ago$/i.exec(label);
     if (daysAgo) return t("interpretation.time.daysAgo", { count: Number(daysAgo[1]) });
   }
 

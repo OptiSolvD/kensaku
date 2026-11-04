@@ -211,7 +211,15 @@
     "opensRelease": "Opens the latest release page in your browser.",
     "howTo": "How to use Kensaku",
     "howToIntro": "A few simple tricks make search feel instant:",
-    "tipTab": "shows or hides the details pane next to results.",
+    "tipLabels": {
+    "tab": "Tab",
+    "aliases": "Aliases",
+    "filters": "Filters",
+    "sort": "Sort",
+    "pin": "Pin",
+    "ocr": "OCR"
+  },
+  "tipTab": "shows or hides the details pane next to results.",
     "tipAliases": "let a word like “resume” also find “cv” and “curriculum”.",
     "tipFilters": "such as {{type}}, {{ext}}, {{in}} and {{modified}} narrow results.",
     "tipSlash": "opens the command menu for quick actions like {{dupes}}, {{doctor}} and {{settings}}.",

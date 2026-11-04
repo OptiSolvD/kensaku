@@ -211,7 +211,15 @@
     "opensRelease": "在浏览器中打开最新版本页面。",
     "howTo": "如何使用 Kensaku",
     "howToIntro": "几个简单技巧让搜索更快：",
-    "tipTab": "显示或隐藏结果旁的信息面板。",
+    "tipLabels": {
+    "tab": "Tab",
+    "aliases": "别名",
+    "filters": "筛选",
+    "sort": "排序",
+    "pin": "固定",
+    "ocr": "OCR"
+  },
+  "tipTab": "显示或隐藏结果旁的信息面板。",
     "tipAliases": "让“简历”这样的词也能找到“cv”和“curriculum”。",
     "tipFilters": "例如 {{type}}、{{ext}}、{{in}} 和 {{modified}} 可缩小结果范围。",
     "tipSlash": "打开命令菜单快速执行操作，例如 {{dupes}}、{{doctor}} 和 {{settings}}。",

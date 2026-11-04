@@ -1561,10 +1561,10 @@ function AboutSection() {
         <div className="space-y-2 p-4 text-[12px] leading-[18px] text-muted">
           <p className="text-fg">{t("about.howToIntro")}</p>
           <ul className="list-disc space-y-1 pl-5">
-            <li><b>Tab</b> {t("about.tipTab")}</li>
-            <li><b>Aliases</b> {t("about.tipAliases")}</li>
+            <li><b>{t("about.tipLabels.tab")}</b> {t("about.tipTab")}</li>
+            <li><b>{t("about.tipLabels.aliases")}</b> {t("about.tipAliases")}</li>
             <li>
-              <b>Filters</b>{" "}
+              <b>{t("about.tipLabels.filters")}</b>{" "}
               {t("about.tipFilters", {
                 type: "type:pdf",
                 ext: "ext:png",
@@ -1581,9 +1581,9 @@ function AboutSection() {
               })}
             </li>
             <li><b>@</b> {t("about.tipAt")}</li>
-            <li><b>Sort</b> {t("about.tipSort")}</li>
-            <li><b>Pin</b> {t("about.tipPin")}</li>
-            <li><b>OCR</b> {t("about.tipOcr")}</li>
+            <li><b>{t("about.tipLabels.sort")}</b> {t("about.tipSort")}</li>
+            <li><b>{t("about.tipLabels.pin")}</b> {t("about.tipPin")}</li>
+            <li><b>{t("about.tipLabels.ocr")}</b> {t("about.tipOcr")}</li>
           </ul>
           <p>{t("about.staysLocal")}</p>
         </div>
