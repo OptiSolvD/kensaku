@@ -1,9 +1,10 @@
-# Kensaku v1.1: final review and release plan
+# Kensaku: review and next-release plan
 
 Scope: `yjid/kensaku` at `bf282df` (v1.0.15). 45.7k lines across `src-tauri/` (Rust),
 `src/` (React + Tauri), `cli/`, and the release workflows.
-This document is the working plan for the next release. Every item has a file:line
-or a measurement behind it, and a stated verification status.
+This document is the working plan for the next release. It does not start a new
+version line: the next release is the next 1.0.x patch after 1.0.15.
+Every item has a file:line or a measurement behind it, and a stated verification status.
 
 **Verification legend**
 - `V` verified directly in this review (code read + logic traced)
@@ -215,7 +216,7 @@ row while holding the write lock. Fix: prefix `UPDATE`, filtered cursor.
 5. Perf batch: allocation-free filters, cached sort key, two indexes, watcher
    and large-file content budgets.
 
-### Phase 1: index correctness (v1.1.0)
+### Phase 1: index correctness (1.0.16)
 6. Crawl-failure containment: unreadable directories protect their subtree.
 7. Rename repair: snapshot descendants before mutating; purge from Tantivy.
 8. One `IgnoreSet` shared by crawler and watcher; `watcher_ok` only after
@@ -225,27 +226,27 @@ row while holding the write lock. Fix: prefix `UPDATE`, filtered cursor.
 10. Exhaustive paging honours scope in the query and pages after the cap
    correctly.
 
-### Phase 2: search performance (v1.1.0)
+### Phase 2: search performance (1.0.16)
 11. Materialized-entry cache keyed by generation (P1), measured on the golden
    set before and after.
 12. Bounded heap + single-pass facets for filter-only browse (P5).
 13. Hoist query-intent regexes (P6).
 14. Add a latency gate to CI using the existing `examples/*_bench.rs`.
 
-### Phase 3: OCR (v1.1.0)
+### Phase 3: OCR (1.0.16)
 15. Tesseract `-l` plus PSM selection, with the settings control.
 16. Stream PDF pages with an aggregate pixel budget; 300 DPI raster fallback.
 17. Length-aware confidence gate; split wide lines.
 18. CLS pooling and normalised cosine for the smart/visual paths.
 
-### Phase 4: shell hardening (v1.1.x)
+### Phase 4: shell hardening (1.0.16 or a follow-up patch)
 19. `reset_all` in-process teardown, not `app.restart()`.
 20. Updater: timeouts, checksum verification, truncated-download rejection,
     portable-mode install path.
 21. Instance lock and `--toggle` correctness; atomic `show()`.
 22. Decide daemon: package it as a sidecar or remove it.
 
-### Acceptance for v1.1.0
+### Acceptance for the next release
 - No warning in the doctor on a clean install on all three platforms.
 - OCR works from the portable zip on a machine with no prior install.
 - Search p50 ≤ 10 ms and p95 ≤ 25 ms on a 500k-file corpus, recorded in
@@ -294,4 +295,4 @@ row while holding the write lock. Fix: prefix `UPDATE`, filtered cursor.
 | `fix/a11y-switch-labels` | accessible names on settings switches |
 | `fix/settings-discard-confirm` | unsaved settings edits are not silently discarded |
 | `perf/polling-while-hidden` | stats polling pauses when hidden |
-| `docs/roadmap-v1.1` | this document |
+| `docs/release-plan` | this document |
