@@ -17,6 +17,11 @@ export function reasonFrom(err: unknown, fallback = "unknown error"): string {
   return fallback;
 }
 
+/* Every control inside a Field inherits its label for assistive tech. The
+   switches were announced as a bare "switch, on" because the visible label
+   was a sibling paragraph with no identifier linking the two. */
+const FieldLabelContext = React.createContext<string | undefined>(undefined);
+
 export function Field({
   label,
   description,
@@ -29,14 +34,17 @@ export function Field({
   hint?: string;
   children: React.ReactNode;
 }) {
+  const labelId = React.useId();
   return (
     <div className="flex min-h-[52px] items-center justify-between gap-6 border-b border-line px-4 py-2.5 last:border-b-0">
       <div className="min-w-0 space-y-0.5">
-        <p className="text-[13px] font-medium text-fg">{label}</p>
+        <p id={labelId} className="text-[13px] font-medium text-fg">{label}</p>
         {description && <p className="line-clamp-2 text-[12px] leading-[18px] text-muted">{description}</p>}
         {hint && <p className="line-clamp-2 text-[12px] leading-[18px] text-subtle">{hint}</p>}
       </div>
-      {children}
+      <FieldLabelContext.Provider value={labelId}>
+        {children}
+      </FieldLabelContext.Provider>
     </div>
   );
 }
@@ -74,11 +82,13 @@ export function Switch({
   disabled?: boolean;
   onChange: (v: boolean) => void;
 }) {
+  const labelId = React.useContext(FieldLabelContext);
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
+      aria-labelledby={labelId}
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className={`relative h-[22px] w-[38px] shrink-0 rounded-full transition-colors duration-200 ${
