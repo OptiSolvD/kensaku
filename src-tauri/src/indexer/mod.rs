@@ -1744,6 +1744,15 @@ impl IndexerManager {
         self.watcher_ok.load(Ordering::Relaxed)
     }
 
+    /// True while a crawl is in progress.
+    ///
+    /// The watcher is stopped for the duration of a crawl and restarted when
+    /// it finishes, so "watcher not running" is the normal state during a scan
+    /// and must not be reported as a fault.
+    pub fn is_crawling(&self) -> bool {
+        self.is_running.load(Ordering::Relaxed)
+    }
+
     /// Brings the process OCR state in line with config and the machine.
     ///
     /// - Applies `ocr_enabled` / `ocr_engine`.

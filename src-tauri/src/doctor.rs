@@ -502,15 +502,27 @@ fn check_watcher(state: &AppState) -> DoctorCheck {
     const LABEL: &str = "File watcher";
 
     if state.indexer.watcher_ok() {
-        ok(ID, LABEL, "Live filesystem watcher is running.".to_string())
-    } else {
-        warn(
+        return ok(ID, LABEL, "Live filesystem watcher is running.".to_string());
+    }
+
+    // A crawl stops the watcher for its duration and restarts it at the end,
+    // so this state is expected while a scan runs. Reporting it as a warning
+    // meant every Health check taken during the launch scan looked broken, and
+    // the suggested fix (reindex) would restart what was about to start anyway.
+    if state.indexer.is_crawling() {
+        return ok(
             ID,
             LABEL,
-            "Watcher is not running (indexing idle or failed to start).".to_string(),
-            Some("Run >reindex to restart the watcher.".to_string()),
-        )
+            "Starts when the current scan finishes.".to_string(),
+        );
     }
+
+    warn(
+        ID,
+        LABEL,
+        "Watcher is not running and no scan is in progress.".to_string(),
+        Some("Run >reindex to restart the watcher.".to_string()),
+    )
 }
 
 #[cfg(target_os = "linux")]
