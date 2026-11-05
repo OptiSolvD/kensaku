@@ -388,5 +388,11 @@
     "visual": "Visual search",
     "visualDescription": "Find images by what they show. Coming later.",
     "comingLater": "Coming later"
+  },
+  "discard": {
+    "title": "Discard unsaved changes?",
+    "body": "Your edits to these settings have not been saved.",
+    "keep": "Keep editing",
+    "discard": "Discard"
   }
 }

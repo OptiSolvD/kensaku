@@ -109,6 +109,7 @@ export function Settings({ onClose, initialSection, onConfigSaved }: SettingsPro
   const [snapshot, setSnapshot] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [discardOpen, setDiscardOpen] = useState(false);
   const dirty = config !== null && snapshot !== null && JSON.stringify(config) !== snapshot;
 
   useEffect(() => {
@@ -122,14 +123,19 @@ export function Settings({ onClose, initialSection, onConfigSaved }: SettingsPro
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onClose();
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      // Escape used to close the panel and throw the edits away with no
+      // prompt. Ask first when there is something to lose.
+      if (dirty) {
+        setDiscardOpen(true);
+        return;
       }
+      onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, dirty]);
 
   const handleSave = async (reindex: boolean) => {
     if (!config) return;
@@ -220,6 +226,15 @@ export function Settings({ onClose, initialSection, onConfigSaved }: SettingsPro
             </button>
           </div>
         </footer>
+        {discardOpen && (
+          <DiscardDialog
+            onKeep={() => setDiscardOpen(false)}
+            onDiscard={() => {
+              setDiscardOpen(false);
+              onClose();
+            }}
+          />
+        )}
       </main>
     </div>
   );
@@ -1874,6 +1889,70 @@ function AboutSection({
 
       {confirmOpen && <ResetDialog onClose={() => setConfirmOpen(false)} />}
     </>
+  );
+}
+
+/* Escape with unsaved edits: keep them or lose them, explicitly. */
+function DiscardDialog({
+  onKeep,
+  onDiscard,
+}: {
+  onKeep: () => void;
+  onDiscard: () => void;
+}) {
+  const { t } = useTranslation("settings");
+  const dialogRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        onKeep();
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    dialogRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [onKeep]);
+
+  return (
+    <div
+      className="fade-in absolute inset-0 z-[60] flex items-center justify-center p-6"
+      style={{ background: "var(--scrim)" }}
+      onMouseDown={(e) => e.target === e.currentTarget && onKeep()}
+    >
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="discard-title"
+        className="elevated w-[380px] rounded-panel p-5"
+      >
+        <h2 id="discard-title" className="text-[14px] font-semibold text-fg">
+          {t("discard.title")}
+        </h2>
+        <p className="mt-1.5 text-[12px] leading-[18px] text-muted">
+          {t("discard.body")}
+        </p>
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onKeep}
+            className="h-8 rounded-control border border-line px-3 text-[12px] font-medium text-fg transition-colors hover:bg-accent-soft"
+          >
+            {t("discard.keep")}
+          </button>
+          <button
+            type="button"
+            onClick={onDiscard}
+            className="h-8 rounded-control bg-danger px-3 text-[12px] font-medium text-bg transition-opacity hover:opacity-90"
+          >
+            {t("discard.discard")}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

@@ -388,5 +388,11 @@
     "visual": "视觉搜索",
     "visualDescription": "按图片内容查找图片。即将推出。",
     "comingLater": "即将推出"
+  },
+  "discard": {
+    "title": "放弃未保存的更改？",
+    "body": "你对这些设置的修改尚未保存。",
+    "keep": "继续编辑",
+    "discard": "放弃"
   }
 }
