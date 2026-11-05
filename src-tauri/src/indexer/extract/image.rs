@@ -112,10 +112,45 @@ fn last_non_empty_line(bytes: &[u8]) -> Option<String> {
         .map(str::to_string)
 }
 
-/// Parses the output of `tesseract --list-langs`.
-///
-/// Handles the `List of available languages` header, blank lines, CRLF line
-/// endings and duplicate entries while preserving the reported order.
+/// Installed Tesseract languages, probed once. Spawning `tesseract
+/// --list-langs` per image would double the process count of a crawl.
+static TESSERACT_LANGUAGES_CACHE: std::sync::Mutex<Option<Vec<String>>> =
+    std::sync::Mutex::new(None);
+
+/// Installed language codes, without spawning Tesseract per image.
+fn installed_tesseract_languages() -> Vec<String> {
+    if let Ok(slot) = TESSERACT_LANGUAGES_CACHE.lock()
+        && let Some(languages) = slot.as_ref()
+    {
+        return languages.clone();
+    }
+
+    let mut command = tesseract_command();
+    command.arg("--list-langs");
+    if let Some(dir) = private_tessdata(&tessdata_dir()) {
+        command.env("TESSDATA_PREFIX", dir);
+    }
+    let languages = match command.output() {
+        Ok(output) if output.status.success() => {
+            let mut langs = parse_langs(&String::from_utf8_lossy(&output.stdout));
+            if langs.is_empty() {
+                // Some builds print the list on stderr.
+                langs = parse_langs(&String::from_utf8_lossy(&output.stderr));
+            }
+            langs
+        }
+        _ => Vec::new(),
+    };
+
+    if let Ok(mut slot) = TESSERACT_LANGUAGES_CACHE.lock() {
+        *slot = Some(languages.clone());
+    }
+    languages
+}
+
+/// Parses `tesseract --list-langs` output: handles the
+/// `List of available languages` header, blank lines, CRLF line endings and
+/// duplicate entries while preserving the reported order.
 fn parse_langs(raw: &str) -> Vec<String> {
     let mut languages: Vec<String> = Vec::new();
     for line in raw.lines() {
@@ -496,6 +531,9 @@ fn tesseract_has_language() -> bool {
 /// Forgets the cached Tesseract probe (Settings "re-check", config changes).
 pub fn reset_tesseract_probe() {
     TESSERACT_PROBE.store(0, Ordering::Relaxed);
+    if let Ok(mut slot) = TESSERACT_LANGUAGES_CACHE.lock() {
+        *slot = None;
+    }
 }
 
 /// Reads text from an image file with whichever engine can run.
@@ -590,8 +628,7 @@ pub fn extract_image_ocr(path: &Path) -> Option<String> {
 /// they name has to exist in `--list-langs`, otherwise Tesseract fails the
 /// whole run.
 fn tesseract_lang_arg() -> Option<String> {
-    let status = tesseract_status();
-    let available = status.languages;
+    let available = installed_tesseract_languages();
 
     let configured = crate::indexer::extract::ocr_languages();
     let mut chosen: Vec<String> = configured
