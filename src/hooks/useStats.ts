@@ -40,10 +40,35 @@ export function useStats(intervalMs: number | null = 2000): UseStatsResult {
   useEffect(() => {
     mounted.current = true;
     fetch();
-    if (intervalMs !== null) {
-      const id = window.setInterval(fetch, intervalMs);
-      return () => window.clearInterval(id);
-    }
+    if (intervalMs === null) return;
+
+    let id: number | null = null;
+    const start = () => {
+      if (id === null) id = window.setInterval(fetch, intervalMs);
+    };
+    const stop = () => {
+      if (id !== null) {
+        window.clearInterval(id);
+        id = null;
+      }
+    };
+    // Polling is for a visible panel. A backgrounded window kept asking for
+    // stats every couple of seconds for as long as the health tab was open.
+    const onVisibility = () => {
+      if (document.hidden) {
+        stop();
+      } else {
+        fetch();
+        start();
+      }
+    };
+
+    if (!document.hidden) start();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [fetch, intervalMs]);
 
   return { stats, live, refresh: fetch };
