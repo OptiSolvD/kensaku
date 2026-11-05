@@ -14,7 +14,8 @@
     "details": "details for selected file",
     "settings": "settings",
     "thisSheet": "this sheet",
-    "escape": "close dialog, clear search, then hide (launcher mode)"
+    "escape": "close dialog, clear search, then hide (launcher mode)",
+    "toggleView": "Toggle grid / list view"
   },
   "filterDescriptions": {
     "type": "category or extension",

@@ -14,7 +14,8 @@
     "details": "查看选中文件的详情",
     "settings": "设置",
     "thisSheet": "打开本帮助",
-    "escape": "关闭对话框、清空搜索，然后隐藏（启动器模式）"
+    "escape": "关闭对话框、清空搜索，然后隐藏（启动器模式）",
+    "toggleView": "切换网格／列表视图"
   },
   "filterDescriptions": {
     "type": "按类别或扩展名",

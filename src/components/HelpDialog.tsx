@@ -12,6 +12,7 @@ const KEYS = [
   { combo: "Shift+Enter", key: "showFolder" },
   { combo: "⌘/Ctrl+C", key: "copyPath" },
   { combo: "⌘/Ctrl+I", key: "details" },
+  { combo: "⌘/Ctrl+Shift+L", key: "toggleView" },
   { combo: "⌘/Ctrl+,", key: "settings" },
   { combo: "?", key: "thisSheet" },
   { combo: "Esc", key: "escape" },

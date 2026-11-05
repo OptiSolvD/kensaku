@@ -193,6 +193,16 @@ function App() {
 
   const showThumbs = config?.show_thumbnails !== false;
   const view: ResultView = config?.results_view === "list" ? "list" : "grid";
+
+  /* Switching layout is a preference, so it goes to config like the sort
+     order does. Extracted from the toolbar handler so the keyboard shortcut
+     and the button share one path. */
+  const setResultView = useCallback((next: ResultView) => {
+    setConfig((c) => (c ? { ...c, results_view: next } : c));
+    invoke<KensakuConfig>("get_config")
+      .then((cfg) => invoke("save_config", { config: { ...cfg, results_view: next } }))
+      .catch(() => undefined);
+  }, []);
   const [menu, setMenu] = useState<{ x: number; y: number; result: SearchResult } | null>(null);
   const [details, setDetails] = useState<SearchResult | null>(null);
   const [showHelp, setShowHelp] = useState(false);
@@ -972,6 +982,15 @@ function App() {
         if (resultsAreStale) return;
         e.preventDefault();
         handleCopyPath(navList[selectedIndex].path);
+      } else if (
+        (e.key === "l" || e.key === "L") &&
+        (e.metaKey || e.ctrlKey) &&
+        e.shiftKey
+      ) {
+        // Cmd/Ctrl+Shift+L flips grid and list. Cmd+L alone belongs to the
+        // browser/OS and must not be taken.
+        e.preventDefault();
+        setResultView(view === "grid" ? "list" : "grid");
       } else if ((e.key === "i" || e.key === "I") && (e.metaKey || e.ctrlKey) && navList[selectedIndex]) {
         // Details for the selected result.
         if (resultsAreStale) return;
@@ -979,7 +998,7 @@ function App() {
         setDetails(navList[selectedIndex]);
       }
     },
-    [isSetupComplete, showSettings, showDuplicates, showHelp, details, menu, query, results, selectedIndex, commandOutput, handleRunCommand, handleOpenFile, handleOpenFolder, openSettings, view, gridColumnCount, slashItems, slashIndex, scopePrefix, scopeItems, scopeIndex, applyScope, preview],
+    [isSetupComplete, showSettings, showDuplicates, showHelp, details, menu, query, results, selectedIndex, commandOutput, handleRunCommand, handleOpenFile, handleOpenFolder, openSettings, view, setResultView, gridColumnCount, slashItems, slashIndex, scopePrefix, scopeItems, scopeIndex, applyScope, preview],
   );
 
   // Window-level, so shortcuts keep working after a dialog closes and focus
@@ -1213,12 +1232,7 @@ function App() {
                     sort={sort}
                     onSort={setSort}
                     view={view}
-                    onView={(v) => {
-                      setConfig((c) => (c ? { ...c, results_view: v } : c));
-                      invoke<KensakuConfig>("get_config")
-                        .then((cfg) => invoke("save_config", { config: { ...cfg, results_view: v } }))
-                        .catch(() => undefined);
-                    }}
+                    onView={setResultView}
                     canSave={displayResults.length > 0}
                     onSave={() => setSaveOpen((v) => !v)}
                   />
