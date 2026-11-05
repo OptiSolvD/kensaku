@@ -118,19 +118,6 @@ impl HeadlessIndex {
     }
 
     /// Runs a query with a stable result offset (MCP pagination).
-    /// Extensions the index refuses to read content from.
-    pub fn excluded_extensions(&self) -> Vec<String> {
-        match self {
-            Self::Daemon => crate::daemon::request("get_config", json!({}))
-                .ok()
-                .and_then(|value| serde_json::from_value::<KensakuConfig>(value).ok())
-                .map(|config| config.excluded_extensions)
-                .unwrap_or_default(),
-            Self::Local(index) => index.config.excluded_extensions.clone(),
-            Self::None => Vec::new(),
-        }
-    }
-
     pub fn search_page(
         &self,
         query: &str,
@@ -385,6 +372,19 @@ impl AgentSession<'_> {
                 .map(|config| config.agent_scoped_roots)
                 .unwrap_or_default(),
             Self::Local(index) => index.config.agent_scoped_roots.clone(),
+            Self::None => Vec::new(),
+        }
+    }
+
+    /// Extensions the index refuses to read content from.
+    pub fn excluded_extensions(&self) -> Vec<String> {
+        match self {
+            Self::Daemon => crate::daemon::request("get_config", json!({}))
+                .ok()
+                .and_then(|value| serde_json::from_value::<KensakuConfig>(value).ok())
+                .map(|config| config.excluded_extensions)
+                .unwrap_or_default(),
+            Self::Local(index) => index.config.excluded_extensions.clone(),
             Self::None => Vec::new(),
         }
     }
