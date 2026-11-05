@@ -468,6 +468,18 @@ impl IndexerManager {
 
     fn emit_status(app_handle: &Arc<RwLock<Option<tauri::AppHandle>>>, status: &IndexingStatus) {
         if let Some(handle) = app_handle.read().as_ref() {
+            // The launcher destroys its window when it hides, and the crawl
+            // keeps running: emitting then posts to a dead HWND, which WebView2
+            // reports as "PostMessage failed ... Invalid window handle" once per
+            // update, for the whole remaining crawl. Nothing can receive the
+            // event, so skip it.
+            use tauri::Manager as _;
+            if handle
+                .get_webview_window(crate::main_window::LABEL)
+                .is_none()
+            {
+                return;
+            }
             use tauri::Emitter;
             let _ = handle.emit("indexing-status", status);
         }
@@ -1224,6 +1236,11 @@ impl IndexerManager {
                 } else {
                     "files changed on disk".to_string()
                 };
+
+                println!(
+                    "[Kensaku Indexer] scan done: {} entries, {} re-read ({})",
+                    files_count, content_count, reason
+                );
 
                 write_crawl_report(&CrawlReport {
                     at: now_unix_secs(),

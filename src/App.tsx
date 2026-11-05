@@ -37,6 +37,7 @@ import { useLanguage } from "./hooks/useLanguage";
 import { PreviewDialog } from "./components/PreviewDialog";
 import { classify } from "./lib/categories";
 import { shouldHideOnBlur } from "./lib/dismiss";
+import { useMeasuredHeight } from "./lib/useMeasuredHeight";
 import { interpretationLabel } from "./lib/interpretation";
 import { inFilter } from "./lib/query";
 import { isNewerVersion } from "./lib/version";
@@ -210,19 +211,12 @@ function App() {
 
 
   const inputRef = useRef<HTMLInputElement>(null);
-  /* The top bar floats over the content; content is inset by its height. */
-  const barRef = useRef<HTMLDivElement>(null);
-  const [barHeight, setBarHeight] = useState(88);
-  useEffect(() => {
-    const el = barRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => setBarHeight(el.offsetHeight));
-    ro.observe(el);
-    setBarHeight(el.offsetHeight);
-    return () => ro.disconnect();
-    // Mount-only: with no dependency array this rebuilt the observer and
-    // forced a layout read after every render, i.e. on every keystroke.
-  }, []);
+  /* The bar floats over the content, so the results are inset by its measured
+     height. That height is not constant: the interpretation row, the category
+     chips and the toolbar appear only once a query has results, making the bar
+     two to three times taller than on the empty screen. See the hook for why
+     this cannot be a mount-only measurement. */
+  const [barHeight, setBarNode] = useMeasuredHeight<HTMLDivElement>(88);
   const resultsContainerRef = useRef<HTMLDivElement>(null);
 
   /** Number of cards in the first grid row (1 in list view). Measured from
@@ -1168,7 +1162,7 @@ function App() {
           {!showSettings && (
             <>
              <div className="relative min-h-0 flex-1">
-              <div ref={barRef} className="bar absolute inset-x-0 top-0 z-20">
+              <div ref={setBarNode} className="bar absolute inset-x-0 top-0 z-20">
               <SearchBar
                 query={query}
                 setQuery={setQuery}
