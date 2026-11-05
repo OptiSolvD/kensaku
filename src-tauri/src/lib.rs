@@ -558,6 +558,12 @@ pub fn run() {
             // show its window on launch. A pending first-run setup always
             // needs UI right away.
             if open_window_on_start {
+                // Apply the window mode before the first paint so a launcher
+                // window never flashes decorated (or, before setup is done,
+                // never appears as a palette that cannot be minimised).
+                if let Some(window) = app.get_webview_window(main_window::LABEL) {
+                    main_window::apply_mode(&window, &config.app_mode);
+                }
                 main_window::show(app.handle());
             }
 

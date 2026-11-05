@@ -33,8 +33,16 @@ fn create(app: &AppHandle) -> tauri::Result<WebviewWindow> {
     // "launcher" mode it stays frameless, off the taskbar, and floats like a
     // palette. (`app_mode` itself defaults to launcher in the config so
     // existing installs keep their behavior; Setup defaults new users to app.)
-    let app_mode = crate::config::KensakuConfig::load().app_mode;
-    let launcher = app_mode != "app";
+    //
+    // Before setup is complete the window is always created as an ordinary
+    // app window. The first-run wizard can index for a long time, so it has to
+    // be minimisable and findable in the dock/taskbar; a frameless, off-taskbar,
+    // always-on-top palette cannot be minimised or restored, and that is what a
+    // fresh install used to get while the wizard was running. The user's mode
+    // choice is applied when the wizard closes (`apply_window_mode`).
+    let config = crate::config::KensakuConfig::load();
+    let in_setup = !config.is_setup_complete;
+    let launcher = !in_setup && config.app_mode != "app";
     let window = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("index.html".into()))
         .title("Kensaku")
         .inner_size(920.0, 640.0)
@@ -73,7 +81,15 @@ fn create(app: &AppHandle) -> tauri::Result<WebviewWindow> {
 /// gets native decorations (title bar, minimize/close) so it behaves like a
 /// normal desktop window; launcher mode stays frameless.
 pub fn apply_mode(window: &WebviewWindow, app_mode: &str) {
-    let launcher = app_mode != "app";
+    // While the setup wizard is up, the window stays an ordinary app window
+    // whatever mode is configured: a frameless, off-taskbar, always-on-top
+    // palette cannot be minimised or restored, and the wizard sits there for
+    // the whole first scan. `apply_window_mode` runs again when it closes.
+    // `is_setup_complete` rather than `is_setup_done`: the latter also waits
+    // for the first scan to finish, and the wizard closes before that, so the
+    // user's chosen mode would be ignored until the next launch.
+    let setup_complete = crate::config::KensakuConfig::load().is_setup_complete;
+    let launcher = app_mode != "app" && setup_complete;
     let _ = window.set_decorations(!launcher);
     let _ = window.set_skip_taskbar(launcher);
     let _ = window.set_always_on_top(launcher);

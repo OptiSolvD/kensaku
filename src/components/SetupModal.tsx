@@ -306,14 +306,20 @@ export function SetupModal({ onSetupCompleted }: { onSetupCompleted: () => void 
   };
 
   /* Setup can index for a long time, so while it is up the window behaves
-     like a normal app window that can be minimized and found again in the
-     taskbar. When the wizard closes, the backend applies the mode the user
-     chose (app or launcher); restoring launcher behavior unconditionally
-     would override an app-mode choice. */
+     like a normal app window: decorated, in the dock/taskbar, minimisable and
+     restorable. That is now also how the backend creates it (a setup window is
+     never a launcher palette), so this is a belt-and-braces correction for a
+     window created before that rule existed or restored mid-setup.
+
+     When the wizard closes, the backend applies the mode the user chose, so a
+     launcher choice is not overridden here. */
   useEffect(() => {
     const win = getCurrentWindow();
     win.setSkipTaskbar(false).catch(() => {});
     win.setAlwaysOnTop(false).catch(() => {});
+    // A setup window that arrived frameless (created while launcher mode was
+    // configured) gets its title bar back, so minimise and restore work.
+    win.setDecorations(true).catch(() => {});
     return () => {
       invoke("apply_window_mode").catch(() => undefined);
     };
