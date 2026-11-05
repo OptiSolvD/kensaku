@@ -314,7 +314,9 @@
     "recheck": "Re-check",
     "languageData": "Language data is downloaded during setup. Use About → Run setup again to acquire it, then re-check here.",
     "languageDataBold": "About → Run setup again",
-    "reportIssue": "Report issue"
+    "reportIssue": "Report issue",
+    "languagesTitle": "Languages",
+    "languagesDescription": "Images are read in these languages. Leave all unselected to use English."
   },
   "doctor": {
     "copyReport": "Copy report",

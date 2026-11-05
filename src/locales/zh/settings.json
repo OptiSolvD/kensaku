@@ -314,7 +314,9 @@
     "recheck": "重新检查",
     "languageData": "语言数据会在设置向导中下载。使用 关于 → 重新运行设置向导 获取，然后在此重新检查。",
     "languageDataBold": "关于 → 重新运行设置向导",
-    "reportIssue": "反馈问题"
+    "reportIssue": "反馈问题",
+    "languagesTitle": "语言",
+    "languagesDescription": "这些语言用于识别图片文字。全部不选则使用英语。"
   },
   "doctor": {
     "copyReport": "复制报告",

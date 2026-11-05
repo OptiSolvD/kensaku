@@ -255,6 +255,49 @@ export function OcrField({
         </select>
       </div>
 
+      {/* Language selection for Tesseract. The installed list is what
+          `--list-langs` reports; picking one writes the config the OCR path
+          passes as `-l`. Empty selection means "English when installed". */}
+      {engine === "tesseract" && (status?.languages?.length ?? 0) > 0 && (
+        <div className="mt-3 flex items-start justify-between gap-4 border-t border-line pt-3">
+          <div className="min-w-0">
+            <p className="text-[11px] font-medium text-fg">{t("ocr.languagesTitle")}</p>
+            <p className="text-[12px] leading-[18px] text-muted">
+              {t("ocr.languagesDescription")}
+            </p>
+          </div>
+          <div className="flex max-w-[190px] flex-wrap justify-end gap-1">
+            {(status?.languages ?? []).map((lang) => {
+              const selected = (config.ocr_languages ?? []).includes(lang);
+              return (
+                <button
+                  key={lang}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() =>
+                    setConfig((c) => {
+                      if (!c) return c;
+                      const current = c.ocr_languages ?? [];
+                      const next = selected
+                        ? current.filter((entry) => entry !== lang)
+                        : [...current, lang];
+                      return { ...c, ocr_languages: next };
+                    })
+                  }
+                  className={`h-6 rounded-control px-2 font-mono text-[11px] transition-colors ${
+                    selected
+                      ? "bg-fg text-bg"
+                      : "border border-line text-muted hover:text-fg"
+                  }`}
+                >
+                  {lang}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {usingPpocr && (status?.accurate_compiled ? (
         <div className="mt-3 border-t border-line pt-3">
           <div className="flex items-center justify-between gap-4">
