@@ -1,8 +1,8 @@
-# Kensaku v1.1: review and release plan
+# Kensaku v1.1: final review and release plan
 
 Scope: `yjid/kensaku` at `bf282df` (v1.0.15). 45.7k lines across `src-tauri/` (Rust),
 `src/` (React + Tauri), `cli/`, and the release workflows.
-This is the working plan for the next release. Every item has a file:line
+This document is the working plan for the next release. Every item has a file:line
 or a measurement behind it, and a stated verification status.
 
 **Verification legend**
@@ -167,10 +167,13 @@ row while holding the write lock. Fix: prefix `UPDATE`, filtered cursor.
 - Thumbnails turning off actually removes loaded thumbnails in grid view.
 - Toolbar measurement no longer rebuilds a `ResizeObserver` per render.
 
+- Settings `Switch` controls were unnamed for screen readers; `Field` now mints a
+  label id and `Switch` consumes it, covering all eight rows.
+- Escape in Settings no longer discards unsaved edits silently.
+
 **Next**
-- Every `Switch` is unnamed for screen readers (`settings/kit.tsx:78`) — add
-  `aria-labelledby`, and ensure dialogs declare `aria-modal` and trap focus.
-- Escape in Settings discards unsaved edits with no prompt (`SettingsModal:122`).
+- `DetailsDialog`/`PreviewDialog`/`HelpDialog` declare `role="dialog"` without
+  `aria-modal`, focus trap or focus restore.
 - Alt-click facet exclusion is a no-op under StrictMode because a setter is
   called inside a state updater (`App.tsx:600`).
 - Paged responses overwrite `total` with `0` (`App.tsx:504`).
@@ -276,12 +279,19 @@ row while holding the write lock. Fix: prefix `UPDATE`, filtered cursor.
   `onnxruntime.dll` is present and non-empty.
 - Frontend: `vitest` added; the dismiss decision is the first suite.
 
+
 ---
 
-## 10. Working agreement
+## 11. Branches opened from this review
 
-- Every fix lands with a test that fails on the old behaviour.
-- Every performance claim lands with a number from `examples/*_bench.rs` in the
-  PR body, measured on the same corpus before and after.
-- A bug is not closed until the artifact that carried it is rebuilt and the
-  built artifact is checked, not just the source.
+| Branch | What it fixes |
+|---|---|
+| `fix/launcher-stability-and-input` | #95 dismissal, IME, Tab, stale rows, snippet observation, hover cost, thumbnail toggle, toolbar measurement |
+| `fix/doctor-crash-classification` | #94 crash-log warning, milestone log split |
+| `fix/release-portable-onnx` | #94 portable OCR library, asserted at build time |
+| `fix/agent-read-scope` | MCP credential read hole, regex pattern quoting |
+| `perf/search-and-index-integrity` | per-entry allocations, rename orphan purge, watcher caps, large-file budget, exclusion purge, watcher status, two indexes |
+| `fix/a11y-switch-labels` | accessible names on settings switches |
+| `fix/settings-discard-confirm` | unsaved settings edits are not silently discarded |
+| `perf/polling-while-hidden` | stats polling pauses when hidden |
+| `docs/roadmap-v1.1` | this document |
