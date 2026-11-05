@@ -706,7 +706,10 @@ fn handle_directory_rename(
                 continue;
             }
 
-            let content = read_text_content(&path, 1_048_576);
+            let content = read_text_content(
+                &path,
+                crate::indexer::extract::content_max_text_bytes() as u64,
+            );
             if let Some(content) = content.as_deref()
                 && let Some(c_index) = content_index.read().as_ref()
             {
@@ -823,7 +826,10 @@ fn handle_file_upsert(
             || crate::indexer::extract::external::handles(path))
         && !is_cloud_placeholder(&meta)
     {
-        read_text_content(path, 100_000)
+        // Match the crawl's configured cap. A hard-coded 100 KB truncated the
+        // first save of any larger file, and the content index kept that
+        // truncated document until the next full crawl.
+        read_text_content(path, crate::indexer::extract::content_max_text_bytes() as u64)
     } else {
         None
     };

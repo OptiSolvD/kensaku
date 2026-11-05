@@ -484,11 +484,10 @@ fn apply_sort(results: &mut [SearchResult], sort: SortOrder) {
                 })
                 .then_with(|| a.path.cmp(&b.path))
         }),
-        SortOrder::Name => results.sort_by(|a, b| {
-            a.filename
-                .to_lowercase()
-                .cmp(&b.filename.to_lowercase())
-                .then_with(|| a.path.cmp(&b.path))
+        // Cached key: a comparator allocating two Strings per comparison was
+        // allocating O(n log n) times to order the page.
+        SortOrder::Name => results.sort_by_cached_key(|result| {
+            (result.filename.to_lowercase(), result.path.clone())
         }),
     }
 }
@@ -1835,16 +1834,12 @@ impl CompiledFilter {
             CompiledFilter::Kind(crate::query::ast::FileKind::Dir) => entry.is_dir,
             CompiledFilter::Kind(crate::query::ast::FileKind::File) => !entry.is_dir,
             CompiledFilter::Lang(lang) => matches_language(lang, entry.extension),
-            CompiledFilter::Name(name) => {
-                // Avoid allocation: compare lowercase name directly
-                // (name is already lowercase in CompiledFilter)
-                entry.name.to_lowercase().contains(name)
+            // Both needles are already lowercased when compiled, and these
+            // run once per file in the corpus, so match without allocating.
+            CompiledFilter::Name(name) => contains_ignore_case(&entry.name, name),
+            CompiledFilter::Path(path_substr) => {
+                contains_ignore_case(&entry.path.to_string_lossy(), path_substr)
             }
-            CompiledFilter::Path(path_substr) => entry
-                .path
-                .to_string_lossy()
-                .to_lowercase()
-                .contains(path_substr),
             CompiledFilter::Not(inner) => !inner.matches(entry),
         }
     }
@@ -1854,98 +1849,152 @@ impl CompiledFilter {
 
 // Removed: replaced by matches_all_compiled_filters + CompiledFilter
 
+/// Case-insensitive substring test with no allocation on the ASCII path.
+///
+/// These run once per file in the corpus on every filtered query, so a
+/// `to_lowercase()` per call was allocating once per file for a substring
+/// check. Non-ASCII pairs still get the exact Unicode behaviour by falling
+/// back to a lowercased comparison.
+fn contains_ignore_case(haystack: &str, needle: &str) -> bool {
+    if needle.is_empty() {
+        return true;
+    }
+    let (hay, needle_bytes) = (haystack.as_bytes(), needle.as_bytes());
+    if hay.len() < needle_bytes.len() {
+        return false;
+    }
+    if hay.is_ascii() && needle.is_ascii() {
+        return hay
+            .windows(needle_bytes.len())
+            .any(|window| window.eq_ignore_ascii_case(needle_bytes));
+    }
+    haystack.to_lowercase().contains(&needle.to_lowercase())
+}
+
+fn ext_is(ext: &str, candidates: &[&str]) -> bool {
+    candidates.iter().any(|candidate| ext.eq_ignore_ascii_case(candidate))
+}
+
 fn matches_type_category(typ: &str, ext_opt: Option<&str>, is_dir: bool) -> bool {
     let ext = match ext_opt {
-        Some(e) => e.to_lowercase(),
+        Some(e) => e,
         None => {
-            if is_dir && (typ == "dir" || typ == "directory" || typ == "folder") {
+            if is_dir && ext_is(typ, &["dir", "directory", "folder"]) {
                 return true;
             }
             return false;
         }
     };
-    match typ.to_lowercase().as_str() {
-        "image" => matches!(
-            ext.as_str(),
-            "png" | "jpg" | "jpeg" | "gif" | "webp" | "svg" | "bmp" | "ico" | "tiff" | "tif"
-        ),
-        "pdf" => ext == "pdf",
-        "doc" | "document" => matches!(
-            ext.as_str(),
-            "doc" | "docx" | "odt" | "rtf" | "pdf" | "txt" | "md" | "pages" | "epub"
-        ),
-        "sheet" | "spreadsheet" | "table" => matches!(
-            ext.as_str(),
-            "xlsx" | "xls" | "ods" | "csv" | "tsv" | "numbers"
-        ),
-        "presentation" | "slide" | "slides" => {
-            matches!(ext.as_str(), "pptx" | "ppt" | "odp" | "key")
-        }
-        "ebook" | "book" => matches!(ext.as_str(), "epub" | "mobi" | "azw3" | "pdf"),
-        "code" => matches!(
-            ext.as_str(),
-            "rs" | "ts"
-                | "tsx"
-                | "js"
-                | "jsx"
-                | "py"
-                | "go"
-                | "c"
-                | "cpp"
-                | "h"
-                | "hpp"
-                | "java"
-                | "kt"
-                | "swift"
-                | "rb"
-                | "php"
-                | "sh"
-                | "html"
-                | "css"
-                | "json"
-                | "toml"
-                | "yaml"
-                | "yml"
-                | "xml"
-                | "sql"
-        ),
-        "video" => matches!(ext.as_str(), "mp4" | "mkv" | "mov" | "avi" | "webm" | "flv"),
-        "audio" => matches!(ext.as_str(), "mp3" | "wav" | "flac" | "aac" | "ogg" | "m4a"),
-        "archive" => matches!(
-            ext.as_str(),
-            "zip" | "tar" | "gz" | "bz2" | "7z" | "rar" | "xz"
-        ),
-        "dir" | "directory" | "folder" => is_dir,
-        other => ext == other,
+    if ext_is(typ, &["image"]) {
+        return ext_is(
+            ext,
+            &["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico", "tiff", "tif"],
+        );
     }
+    if ext_is(typ, &["pdf"]) {
+        return ext.eq_ignore_ascii_case("pdf");
+    }
+    if ext_is(typ, &["doc", "document"]) {
+        return ext_is(
+            ext,
+            &["doc", "docx", "odt", "rtf", "pdf", "txt", "md", "pages", "epub"],
+        );
+    }
+    if ext_is(typ, &["sheet", "spreadsheet", "table"]) {
+        return ext_is(ext, &["xlsx", "xls", "ods", "csv", "tsv", "numbers"]);
+    }
+    if ext_is(typ, &["presentation", "slide", "slides"]) {
+        return ext_is(ext, &["pptx", "ppt", "odp", "key"]);
+    }
+    if ext_is(typ, &["ebook", "book"]) {
+        return ext_is(ext, &["epub", "mobi", "azw3", "pdf"]);
+    }
+    if ext_is(typ, &["code"]) {
+        return ext_is(
+            ext,
+            &[
+                "rs", "ts", "tsx", "js", "jsx", "py", "go", "c", "cpp", "h", "hpp", "java", "kt",
+                "swift", "rb", "php", "sh", "html", "css", "json", "toml", "yaml", "yml", "xml",
+                "sql",
+            ],
+        );
+    }
+    if ext_is(typ, &["video"]) {
+        return ext_is(ext, &["mp4", "mkv", "mov", "avi", "webm", "flv"]);
+    }
+    if ext_is(typ, &["audio"]) {
+        return ext_is(ext, &["mp3", "wav", "flac", "aac", "ogg", "m4a"]);
+    }
+    if ext_is(typ, &["archive"]) {
+        return ext_is(ext, &["zip", "tar", "gz", "bz2", "7z", "rar", "xz"]);
+    }
+    if ext_is(typ, &["dir", "directory", "folder"]) {
+        return is_dir;
+    }
+    ext.eq_ignore_ascii_case(typ)
 }
 
+#[allow(dead_code)]
 fn matches_language(lang: &str, ext_opt: Option<&str>) -> bool {
     let ext = match ext_opt {
-        Some(e) => e.to_lowercase(),
+        Some(e) => e,
         None => return false,
     };
-    match lang.to_lowercase().as_str() {
-        "rust" => ext == "rs",
-        "python" | "py" => ext == "py",
-        "typescript" | "ts" => ext == "ts" || ext == "tsx",
-        "javascript" | "js" => ext == "js" || ext == "jsx" || ext == "mjs" || ext == "cjs",
-        "go" => ext == "go",
-        "c" => ext == "c" || ext == "h",
-        "cpp" | "c++" => matches!(ext.as_str(), "cpp" | "cc" | "cxx" | "hpp" | "h"),
-        "java" => ext == "java",
-        "kotlin" | "kt" => ext == "kt" || ext == "kts",
-        "swift" => ext == "swift",
-        "ruby" | "rb" => ext == "rb",
-        "php" => ext == "php",
-        "shell" | "bash" | "sh" => matches!(ext.as_str(), "sh" | "bash" | "zsh"),
-        "html" => ext == "html" || ext == "htm",
-        "css" => ext == "css" || ext == "scss" || ext == "sass",
-        "json" => ext == "json",
-        "markdown" | "md" => ext == "md" || ext == "markdown",
-        "sql" => ext == "sql",
-        other => ext == other,
+    if ext_is(lang, &["rust"]) {
+        return ext.eq_ignore_ascii_case("rs");
     }
+    if ext_is(lang, &["python", "py"]) {
+        return ext.eq_ignore_ascii_case("py");
+    }
+    if ext_is(lang, &["typescript", "ts"]) {
+        return ext_is(ext, &["ts", "tsx"]);
+    }
+    if ext_is(lang, &["javascript", "js"]) {
+        return ext_is(ext, &["js", "jsx", "mjs", "cjs"]);
+    }
+    if ext_is(lang, &["go"]) {
+        return ext.eq_ignore_ascii_case("go");
+    }
+    if ext_is(lang, &["c"]) {
+        return ext_is(ext, &["c", "h"]);
+    }
+    if ext_is(lang, &["cpp", "c++"]) {
+        return ext_is(ext, &["cpp", "cc", "cxx", "hpp", "h"]);
+    }
+    if ext_is(lang, &["java"]) {
+        return ext.eq_ignore_ascii_case("java");
+    }
+    if ext_is(lang, &["kotlin", "kt"]) {
+        return ext_is(ext, &["kt", "kts"]);
+    }
+    if ext_is(lang, &["swift"]) {
+        return ext.eq_ignore_ascii_case("swift");
+    }
+    if ext_is(lang, &["ruby", "rb"]) {
+        return ext.eq_ignore_ascii_case("rb");
+    }
+    if ext_is(lang, &["php"]) {
+        return ext.eq_ignore_ascii_case("php");
+    }
+    if ext_is(lang, &["shell", "bash", "sh"]) {
+        return ext_is(ext, &["sh", "bash", "zsh"]);
+    }
+    if ext_is(lang, &["html"]) {
+        return ext_is(ext, &["html", "htm"]);
+    }
+    if ext_is(lang, &["css"]) {
+        return ext_is(ext, &["css", "scss", "sass"]);
+    }
+    if ext_is(lang, &["json"]) {
+        return ext.eq_ignore_ascii_case("json");
+    }
+    if ext_is(lang, &["markdown", "md"]) {
+        return ext_is(ext, &["md", "markdown"]);
+    }
+    if ext_is(lang, &["sql"]) {
+        return ext.eq_ignore_ascii_case("sql");
+    }
+    ext.eq_ignore_ascii_case(lang)
 }
 
 #[cfg(test)]

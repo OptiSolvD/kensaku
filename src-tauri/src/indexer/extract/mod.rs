@@ -10,7 +10,7 @@ use crate::config::ExternalExtractor;
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs::File;
-use std::io::Read;
+use std::io::{Read, Seek};
 use std::path::{Path, PathBuf};
 use std::sync::{Condvar, Mutex};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
@@ -740,23 +740,52 @@ fn extract_document_inner(
             })
         }
         DocumentFormat::PlainText | DocumentFormat::Unknown => {
-            // Head/tail policy for plain text > 1MB:
-            if file_size > 1_000_000 {
-                // Read head 512KB + tail 512KB
+            // Large plain text: read a head and a tail within the configured
+            // content budget.
+            //
+            // This used to hard-code 1 MB / 512 KB + 512 KB, ignoring
+            // `content_max_text_bytes` entirely, so the "deep content" setting
+            // could not reach past a megabyte and the middle of every large
+            // file was silently unsearchable.
+            let budget = capped_bytes.max(1024);
+            if file_size > budget as u64 {
+                let half = budget / 2;
                 let mut f = File::open(path).ok()?;
-                let mut head = vec![0u8; 512_000];
-                let n_head = f.read(&mut head).unwrap_or(0);
-                head.truncate(n_head);
 
-                use std::io::Seek;
-                let _ = f.seek(std::io::SeekFrom::End(-512_000));
-                let mut tail = vec![0u8; 512_000];
-                let n_tail = f.read(&mut tail).unwrap_or(0);
-                tail.truncate(n_tail);
+                let mut head_bytes = vec![0u8; half];
+                let n_head = f.read(&mut head_bytes).unwrap_or(0);
+                head_bytes.truncate(n_head);
+                // Never end the head mid-character.
+                let head_end = match std::str::from_utf8(&head_bytes) {
+                    Ok(_) => head_bytes.len(),
+                    Err(error) => error.valid_up_to(),
+                };
 
-                let head_str = String::from_utf8_lossy(&head);
-                let tail_str = String::from_utf8_lossy(&tail);
-                let combined = format!("{}\n\n... [content omitted] ...\n\n{}", head_str, tail_str);
+                let mut tail_bytes = vec![0u8; half];
+                let n_tail = if f
+                    .seek(std::io::SeekFrom::End(-(half as i64)))
+                    .is_ok()
+                {
+                    f.read(&mut tail_bytes).unwrap_or(0)
+                } else {
+                    0
+                };
+                tail_bytes.truncate(n_tail);
+                // Start the tail on a character boundary (skip continuation
+                // bytes left by cutting a multi-byte sequence in half).
+                let mut tail_start = 0;
+                while tail_start < tail_bytes.len().min(3)
+                    && (tail_bytes[tail_start] & 0xC0) == 0x80
+                {
+                    tail_start += 1;
+                }
+
+                let head_str = String::from_utf8_lossy(&head_bytes[..head_end]);
+                let tail_str = String::from_utf8_lossy(&tail_bytes[tail_start..]);
+                let combined = format!(
+                    "{}\n\n... [content omitted] ...\n\n{}",
+                    head_str, tail_str
+                );
 
                 Some(DocumentExtract {
                     text: combined,

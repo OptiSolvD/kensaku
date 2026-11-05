@@ -681,15 +681,21 @@ impl IndexerManager {
 
             for entry in all_entries {
                 files_count += 1;
-                crawled_paths.insert(entry.path.clone());
 
                 // Skip files whose extension is in the excluded list.
+                //
+                // The path is deliberately NOT marked as crawled: marking it
+                // meant a file indexed before its extension was excluded was
+                // never re-read and never removed, so the exclusion only ever
+                // applied to files that did not exist yet.
                 if !entry.is_dir
                     && let Some(ext) = entry.extension
                     && excluded_exts.iter().any(|e| e.eq_ignore_ascii_case(ext))
                 {
                     continue;
                 }
+
+                crawled_paths.insert(entry.path.clone());
 
                 // Incremental crawl: a cheap read-lock check first, so an
                 // unchanged tree never contends on the write lock or touches

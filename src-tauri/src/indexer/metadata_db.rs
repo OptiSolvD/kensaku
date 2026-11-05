@@ -167,6 +167,28 @@ impl MetadataDb {
             eprintln!("[Kensaku] Failed to create unembedded index: {}", e);
         }
 
+        // The embedding queue orders unembedded rows by `modified`, so the
+        // partial index above still needed a full scan plus a temp b-tree on
+        // every poll. Cover the order too.
+        if let Err(e) = conn.execute(
+            "CREATE INDEX IF NOT EXISTS nodes_unembedded_modified
+             ON nodes(modified DESC, size) WHERE indexed_gen = 0",
+            [],
+        ) {
+            eprintln!("[Kensaku] Failed to create unembedded order index: {}", e);
+        }
+
+        // Burst grouping probes candidates by neighbourhood, image dimensions
+        // and orientation. Without this it full-scans `nodes` once per image
+        // during a crawl and again in the backfill.
+        if let Err(e) = conn.execute(
+            "CREATE INDEX IF NOT EXISTS nodes_burst_candidates
+             ON nodes(is_dir, modified, width, height)",
+            [],
+        ) {
+            eprintln!("[Kensaku] Failed to create burst candidate index: {}", e);
+        }
+
         // Dedicated storage for visual embeddings (K18).
         if let Err(e) = conn.execute(
             "CREATE TABLE IF NOT EXISTS visual_units (
@@ -769,7 +791,7 @@ impl MetadataDb {
         let mut stmt = conn
             .prepare(
                 "SELECT id, path, size, modified, content_hash FROM nodes
-                 WHERE is_dir = 0 AND (indexed_gen = 0 OR indexed_gen IS NULL)
+                 WHERE is_dir = 0 AND indexed_gen = 0
                  ORDER BY modified DESC, size ASC
                  LIMIT ?1",
             )
