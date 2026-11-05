@@ -31,21 +31,13 @@ jobs:
   rust:
     name: Rust
     runs-on: ubuntu-22.04
+    # A compile plus tests takes about 10 minutes. Without a bound, a stalled
+    # download or build hangs until the workflow timeout.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            patchelf \
-            libgtk-3-dev \
-            build-essential \
-            curl \
-            wget \
-            file
+        uses: ./.github/actions/linux-deps
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy

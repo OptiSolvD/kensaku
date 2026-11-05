@@ -1,0 +1,54 @@
+name: Linux build dependencies
+description: >
+  Install the GTK/WebKit packages Tauri needs to compile on Linux, with a bounded,
+  cached download.
+
+# Why this exists rather than an inline apt-get in each workflow:
+#
+# The step used to be `apt-get update` plus `apt-get install -y`, repeated in every
+# Linux job. That pulls 135 packages and 55.5 MB of archives per job, per run, from
+# the shared Ubuntu mirror. On a good run it takes about 25 seconds. When the mirror
+# stalls it took 8m56s once and over 30 minutes on another run, because apt has no
+# timeout of its own and will wait indefinitely on a stuck connection.
+#
+# Three changes keep it predictable:
+#   - the downloaded archives are cached, so only a cache miss downloads them;
+#   - acquisitions have a timeout and retries, so a stalled mirror retries instead
+#     of hanging the job;
+#   - recommends are skipped, which is fewer packages for the same build.
+runs:
+  using: composite
+  steps:
+    - name: Cache apt archives
+      uses: actions/cache@v4
+      with:
+        path: /var/cache/apt/archives
+        # Keyed on this file, so changing the package list invalidates the cache.
+        key: apt-archives-${{ runner.os }}-${{ hashFiles('.github/actions/linux-deps/action.yml') }}
+        restore-keys: |
+          apt-archives-${{ runner.os }}-
+
+    - name: Install packages
+      shell: bash
+      env:
+        DEBIAN_FRONTEND: noninteractive
+        # Fail a stalled connection after 20s and retry, instead of waiting forever.
+        APT_OPTS: >-
+          -o Acquire::Retries=3
+          -o Acquire::http::Timeout=20
+          -o Acquire::https::Timeout=20
+          -o Acquire::http::Pipeline-Depth=0
+      run: |
+        # The cache restores root-owned files; the cache action runs unprivileged.
+        sudo chmod -R a+rX /var/cache/apt/archives 2>/dev/null || true
+        sudo apt-get $APT_OPTS update
+        sudo apt-get $APT_OPTS install -y --no-install-recommends \
+          libwebkit2gtk-4.1-dev \
+          libayatana-appindicator3-dev \
+          librsvg2-dev \
+          patchelf \
+          libgtk-3-dev \
+          build-essential \
+          curl \
+          wget \
+          file

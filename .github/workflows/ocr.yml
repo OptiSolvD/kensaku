@@ -28,6 +28,9 @@ jobs:
   ocr:
     name: PP-OCR (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    # Long enough for a cold Rust build plus the model tests, short enough that a
+    # stalled download or build fails instead of hanging until the run timeout.
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
@@ -49,9 +52,7 @@ jobs:
 
       - name: Linux deps
         if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libgtk-3-dev build-essential
+        uses: ./.github/actions/linux-deps
 
       - uses: dtolnay/rust-toolchain@stable
       - uses: oven-sh/setup-bun@v2
