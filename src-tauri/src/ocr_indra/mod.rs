@@ -73,9 +73,10 @@ pub fn extract_image(path: &Path) -> OcrOutcome {
     if !(pack_present() && crate::ocr::runtime_loadable()) {
         return OcrOutcome::Unavailable;
     }
-    match image::open(path) {
-        Ok(image) => extract_decoded(&image),
-        Err(_) => OcrOutcome::NoText,
+    // Budgeted decode: see `indexer::extract::image::decode_for_recognition`.
+    match crate::indexer::extract::image::decode_for_recognition(path) {
+        Some((image, _reserved)) => extract_decoded(&image),
+        None => OcrOutcome::NoText,
     }
 }
 

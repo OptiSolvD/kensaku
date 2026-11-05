@@ -143,7 +143,7 @@ fn extract_scanned_pdf_ocr(doc: &Document, max_bytes: usize) -> (Option<String>,
                 skipped.push(reason);
             }
         },
-        |image| {
+        |image, _reserved| {
             decoded_pages += 1;
             if collected.len() >= max_bytes || unavailable {
                 // Stop decoding further pages: the text budget is spent or

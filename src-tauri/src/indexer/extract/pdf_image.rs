@@ -39,7 +39,7 @@ pub fn for_each_page_image(
     doc: &Document,
     max_images: usize,
     mut on_skip: impl FnMut(String),
-    mut on_image: impl FnMut(DynamicImage) -> bool,
+    mut on_image: impl FnMut(DynamicImage, crate::util::budget::Permit) -> bool,
 ) {
     let mut seen = std::collections::HashSet::new();
     let mut emitted = 0usize;
@@ -57,11 +57,22 @@ pub fn for_each_page_image(
             let Ok(stream) = doc.get_object(pdf_image.id).and_then(Object::as_stream) else {
                 continue;
             };
+            // Reserve the decoded size before the decoder allocates it. The
+            // permit travels with the image, so the reservation covers OCR and
+            // is released as soon as the page is dropped.
+            let width = dict_u32(doc, &stream.dict, b"Width");
+            let height = dict_u32(doc, &stream.dict, b"Height");
+            let (Some(width), Some(height)) = (width, height) else {
+                on_skip(format!("page {page_no}: missing Width or Height"));
+                continue;
+            };
+            let permit = crate::util::budget::decode_budget()
+                .acquire(crate::util::budget::rgba_bytes(width, height));
             match decode_image_stream(doc, stream) {
                 Ok(image) => {
                     emitted += 1;
                     // Dropped by the caller before the next decode.
-                    if !on_image(image) {
+                    if !on_image(image, permit) {
                         return;
                     }
                 }
@@ -79,7 +90,9 @@ pub fn page_images(
     mut on_skip: impl FnMut(String),
 ) -> Vec<DynamicImage> {
     let mut out = Vec::new();
-    for_each_page_image(doc, max_images, &mut on_skip, |image| {
+    // Collected pages are not charged to the budget: this form exists for
+    // tests and tooling. Production OCR uses `for_each_page_image`.
+    for_each_page_image(doc, max_images, &mut on_skip, |image, _reserved| {
         out.push(image);
         true
     });

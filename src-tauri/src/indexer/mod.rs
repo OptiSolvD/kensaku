@@ -1657,8 +1657,13 @@ impl IndexerManager {
                 {
                     v
                 } else if path.is_file() {
-                    let img = image::open(path)
-                        .map_err(|e| format!("Failed to open image {}: {}", path.display(), e))?;
+                    // Budgeted decode, same as OCR: the page is charged to the
+                    // decode budget until embedding has consumed it.
+                    let (img, _reserved) =
+                        crate::indexer::extract::image::decode_for_recognition(path)
+                            .ok_or_else(|| {
+                                format!("Failed to open image {}", path.display())
+                            })?;
                     encoder.embed_image(&img)
                 } else {
                     return Err(format!(

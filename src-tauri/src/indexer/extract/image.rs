@@ -766,7 +766,25 @@ pub fn image_dimensions(path: &Path) -> Option<(u32, u32)> {
 /// The dimensions are checked up front and the decoder itself is configured
 /// with matching width/height/allocation limits, so an image cannot expand
 /// into a much larger in-memory buffer than advertised.
-fn decode_guarded(path: &Path) -> Option<DynamicImage> {
+/// Decodes an image for recognition, holding a budget reservation for as long
+/// as the caller keeps the returned permit.
+///
+/// Every full-page decode that feeds OCR or visual embedding goes through here,
+/// so the peak number of decoded pixel buffers in memory is bounded by
+/// `util::budget::decode_budget()` no matter how many workers run. The
+/// reservation is taken before the decoder allocates, and the image is only
+/// decoded once the reservation succeeds.
+pub(crate) fn decode_for_recognition(
+    path: &Path,
+) -> Option<(DynamicImage, crate::util::budget::Permit)> {
+    let (width, height) = dimensions(path)?;
+    let permit = crate::util::budget::decode_budget()
+        .acquire(crate::util::budget::rgba_bytes(width, height));
+    let image = decode_guarded(path)?;
+    Some((image, permit))
+}
+
+pub(crate) fn decode_guarded(path: &Path) -> Option<DynamicImage> {
     let (width, height) = dimensions(path)?;
 
     let mut reader = ImageReader::open(path).ok()?.with_guessed_format().ok()?;
@@ -998,6 +1016,29 @@ mod tests {
         save(&RgbImage::from_pixel(10, 7, Rgb([1, 2, 3])), &path);
 
         assert_eq!(dimensions(&path), Some((10, 7)));
+    }
+
+    #[test]
+    fn recognition_decode_reserves_exactly_the_decoded_size() {
+        // The reservation must equal the RGBA size of the page, and must be
+        // held for as long as the caller keeps the permit: that is what keeps
+        // the peak bounded while OCR runs.
+        let dir = TempDir::new("reserve");
+        let path = dir.join("page.png");
+        save(&RgbImage::from_pixel(64, 48, Rgb([9, 9, 9])), &path);
+
+        let (image, permit) = decode_for_recognition(&path).expect("decodes");
+        assert_eq!((image.width(), image.height()), (64, 48));
+        assert_eq!(permit.bytes(), crate::util::budget::rgba_bytes(64, 48));
+        drop(permit);
+    }
+
+    #[test]
+    fn recognition_decode_refuses_corrupt_files_without_reserving() {
+        let dir = TempDir::new("reserve-corrupt");
+        let path = dir.join("broken.png");
+        std::fs::write(&path, b"not an image").expect("write");
+        assert!(decode_for_recognition(&path).is_none());
     }
 
     #[test]

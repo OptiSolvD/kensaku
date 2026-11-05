@@ -337,7 +337,11 @@ pub fn extract_image_ocr(path: &Path) -> OcrOutcome {
         let Some(engine) = accurate_engine() else {
             return OcrOutcome::Unavailable;
         };
-        let Ok(image) = image::open(path) else {
+        // Budgeted: the decoded page is charged against the decode budget for
+        // as long as recognition holds it.
+        let Some((image, _reserved)) =
+            crate::indexer::extract::image::decode_for_recognition(path)
+        else {
             return OcrOutcome::NoText;
         };
         recognize(&engine, &image)

@@ -364,7 +364,11 @@ pub const MAX_REGEX_PATTERN_LEN: usize = 1024;
 /// v1: K5 schema (content_folded + content_raw)
 /// v2: K15 schema (CJK-aware "kensaku" tokenizer on filename and content)
 /// v3: ext/size fields for filter pushdown (K12/B4)
-pub const CONTENT_SCHEMA_VERSION: u32 = 3;
+/// v4: trigram field stores term frequencies only, not positions (#129).
+///     Nothing queries positions: folded search builds boolean term queries,
+///     and no phrase query exists. Positions were roughly the largest single
+///     contributor to index size per file.
+pub const CONTENT_SCHEMA_VERSION: u32 = 4;
 
 /// Records the schema version the schema version this index was written with.
 ///
@@ -398,9 +402,12 @@ impl ContentIndex {
         let filename_field = schema_builder.add_text_field("filename", filename_options);
         let content_options = TextOptions::default().set_indexing_options(kensaku_indexing);
         let content_field = schema_builder.add_text_field("content", content_options);
+        // Frequencies only: folded search queries individual trigram terms
+        // through boolean term queries and verifies candidates against the
+        // stored raw text, so positions are never read. See schema v4.
         let folded_indexing = TextFieldIndexing::default()
             .set_tokenizer("trigram")
-            .set_index_option(IndexRecordOption::WithFreqsAndPositions);
+            .set_index_option(IndexRecordOption::WithFreqs);
         let folded_field = schema_builder.add_text_field(
             "content_folded",
             TextOptions::default().set_indexing_options(folded_indexing),
@@ -437,6 +444,8 @@ impl ContentIndex {
                     "K15 CJK tokenizer migration (schema v1 -> v2)"
                 } else if !has_pushdown {
                     "K12 filter pushdown migration (schema v2 -> v3)"
+                } else if marker_version < 4 {
+                    "trigram posting format change (schema v3 -> v4, #129)"
                 } else {
                     "Content schema marker is stale"
                 };
@@ -1628,7 +1637,7 @@ mod tests {
         let new_content = new_schema_builder.add_text_field("content", TEXT);
         let folded_indexing = TextFieldIndexing::default()
             .set_tokenizer("trigram")
-            .set_index_option(IndexRecordOption::WithFreqsAndPositions);
+            .set_index_option(IndexRecordOption::WithFreqs);
         let new_folded = new_schema_builder.add_text_field(
             "content_folded",
             TextOptions::default().set_indexing_options(folded_indexing),
@@ -1811,6 +1820,60 @@ mod tests {
         assert_eq!(index.search_folded("nutsmp", 10, None).len(), 1);
 
         drop(index);
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn schema_v3_index_rebuilds_once_then_stays_put() {
+        // The upgrade this release makes: an index written at schema 3 must be
+        // rebuilt into the positionless trigram format, and must not be rebuilt
+        // again on the next launch. A rebuild on every launch is the exact
+        // failure mode reported earlier, so it is pinned here.
+        let nanos = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "kensaku-content-v4-{}-{}",
+            std::process::id(),
+            nanos
+        ));
+        let index_dir = root.join("index");
+
+        let fresh = ContentIndex::new(&index_dir).expect("fresh index");
+        drop(fresh);
+
+        // Pretend this directory was written by the previous release.
+        fs::write(index_dir.join(SCHEMA_MARKER_FILE), "3").unwrap();
+
+        let migrated = ContentIndex::new(&index_dir).expect("migrate v3 index");
+        assert!(migrated.rebuilt, "a schema 3 index must be rebuilt");
+        assert_eq!(
+            migrated.rebuild_reason.as_deref(),
+            Some("trigram posting format change (schema v3 -> v4, #129)")
+        );
+        migrated
+            .add_or_update(
+                Path::new("/tmp/kensaku/v4/note.txt"),
+                "note.txt",
+                "Visit donutsmp.net",
+                0,
+                0,
+                Some("txt"),
+            )
+            .unwrap();
+        migrated.commit().unwrap();
+        assert_eq!(
+            migrated.search_folded("nutsmp", 10, None).len(),
+            1,
+            "folded search must keep working on the rebuilt index"
+        );
+        drop(migrated);
+
+        let reopened = ContentIndex::new(&index_dir).expect("reopen v4 index");
+        assert!(!reopened.rebuilt, "a schema 4 index must not rebuild on launch");
+        drop(reopened);
+
         let _ = fs::remove_dir_all(&root);
     }
 
