@@ -396,5 +396,20 @@
     "body": "Your edits to these settings have not been saved.",
     "keep": "Keep editing",
     "discard": "Discard"
+  },
+  "indexingBanner": {
+    "walking": "Checking your folders",
+    "foundFiles": "{{count}} entries found",
+    "checking": "Looking for changes",
+    "extracting": "Indexing",
+    "progress": "{{done}} of {{total}} files",
+    "progressUnknown": "{{done}} files",
+    "embedding": "Building the semantic index",
+    "committing": "Saving the index",
+    "almostDone": "Almost done",
+    "rebuilding": "Rebuilding the index",
+    "working": "Indexing",
+    "workingShort": "Working",
+    "screenReader": "Indexing is in progress. Search results will include the remaining files when it finishes."
   }
 }

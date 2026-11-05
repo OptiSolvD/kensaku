@@ -396,5 +396,20 @@
     "body": "你对这些设置的修改尚未保存。",
     "keep": "继续编辑",
     "discard": "放弃"
+  },
+  "indexingBanner": {
+    "walking": "正在检查文件夹",
+    "foundFiles": "找到 {{count}} 个条目",
+    "checking": "正在查找更改",
+    "extracting": "正在索引",
+    "progress": "{{done}} / {{total}} 个文件",
+    "progressUnknown": "{{done}} 个文件",
+    "embedding": "正在构建语义索引",
+    "committing": "正在保存索引",
+    "almostDone": "即将完成",
+    "rebuilding": "正在重建索引",
+    "working": "正在索引",
+    "workingShort": "处理中",
+    "screenReader": "正在建立索引。完成后搜索结果将包含其余文件。"
   }
 }

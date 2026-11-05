@@ -48,6 +48,7 @@ import {
   formatReleaseDate,
 } from "../lib/updater";
 import type { UpdateInfo, UpdateStatus } from "../types";
+import { IndexingBanner } from "./IndexingBanner";
 
 export interface SettingsProps {
   onClose: () => void;
@@ -191,7 +192,7 @@ export function Settings({ onClose, initialSection, onConfigSaved }: SettingsPro
         </div>
       </nav>
 
-      <main className="surface relative z-10 m-2 ml-0 min-w-0 flex-1 overflow-hidden rounded-sheet">
+      <main className="surface relative z-10 m-2 ml-0 flex min-w-0 flex-1 flex-col overflow-hidden rounded-sheet">
         <button
           type="button"
           title={t("close")}
@@ -200,7 +201,12 @@ export function Settings({ onClose, initialSection, onConfigSaved }: SettingsPro
         >
           <X className="h-4 w-4" strokeWidth={1.75} />
         </button>
-        <div className="absolute inset-0 overflow-y-auto px-6 pb-20 pt-6" style={{ scrollbarGutter: "stable" }}>
+        {/* Indexing is announced at the top of the panel: the main window's
+            status line is hidden behind this overlay, so a scan started here
+            was completely invisible. In flow rather than overlaid, so it never
+            covers the first row of settings. */}
+        <IndexingBanner />
+        <div className="relative min-h-0 flex-1 overflow-y-auto px-6 pb-20 pt-6" style={{ scrollbarGutter: "stable" }}>
           <div className="mx-auto max-w-[640px]">
             {config ? (
               <SectionShell section={section}>{renderSection(section, config, setConfig)}</SectionShell>
