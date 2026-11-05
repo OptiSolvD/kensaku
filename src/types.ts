@@ -378,12 +378,23 @@ export interface ModelsStatus {
 
 /* ---- Doctor (run_doctor). One-shot diagnostics; never auto-blocks UI. ---- */
 
+/** A repair the Health page can run for a failing check. */
+export interface DoctorAction {
+  /** `download-models`, `download-ocr-pack`, `download-indra-pack`,
+   *  `restart-watcher`, `cleanup-storage`, `reindex`, `open-crash-log`. */
+  kind: string;
+  label: string;
+  /** Settings section to open, for kinds that navigate instead of acting. */
+  section?: string | null;
+}
+
 export interface DoctorCheck {
   id: string;
   label: string;
   status: "ok" | "warn" | "fail";
   detail: string;
   fix: string | null;
+  action?: DoctorAction | null;
 }
 
 export interface DoctorReport {

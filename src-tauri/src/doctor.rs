@@ -18,6 +18,49 @@ pub struct DoctorCheck {
     pub status: String,
     pub detail: String,
     pub fix: Option<String>,
+    /// What the UI can do about it, when there is something to do.
+    ///
+    /// The fix text alone was a dead end: the models row said "download model
+    /// files in AI & Semantic", and that panel has no download button, so the
+    /// instruction could not be followed. A check that knows how to repair
+    /// itself should offer that, not a sentence to copy.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub action: Option<DoctorAction>,
+}
+
+/// A repair the Health page can perform, named rather than described.
+///
+/// String kinds rather than a closed enum in the JSON: the frontend switches on
+/// them, and an unknown kind is simply not rendered as a button, so an older UI
+/// talking to a newer backend degrades instead of breaking.
+#[derive(Debug, Clone, Serialize)]
+pub struct DoctorAction {
+    /// Stable identifier: `download-models`, `download-ocr-pack`,
+    /// `restart-watcher`, `cleanup-storage`, `open-crash-log`,
+    /// `reindex`, `open-settings`.
+    pub kind: String,
+    pub label: String,
+    /// Settings section to open, for `open-settings`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub section: Option<String>,
+}
+
+impl DoctorAction {
+    fn new(kind: &str, label: &str) -> Self {
+        Self {
+            kind: kind.to_string(),
+            label: label.to_string(),
+            section: None,
+        }
+    }
+
+    fn opening(kind: &str, label: &str, section: &str) -> Self {
+        Self {
+            kind: kind.to_string(),
+            label: label.to_string(),
+            section: Some(section.to_string()),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -48,7 +91,14 @@ fn check(id: &str, label: &str, status: &str, detail: String, fix: Option<String
         status: status.to_string(),
         detail,
         fix,
+        action: None,
     }
+}
+
+/// Attaches a repair action to a check.
+fn with_action(mut check: DoctorCheck, action: DoctorAction) -> DoctorCheck {
+    check.action = Some(action);
+    check
 }
 
 fn ok(id: &str, label: &str, detail: String) -> DoctorCheck {
@@ -199,13 +249,16 @@ fn check_crash_log() -> DoctorCheck {
     // healthy install could show a warning whose text was the app's own
     // "config loaded" line.
     match crate::crashlog::last_failure() {
-        Some(line) => warn(
-            ID,
-            LABEL,
-            line,
-            // The fix is intentionally just the path: the UI opens it in the
-            // user's editor rather than trying to interpret the crash.
-            Some(path.display().to_string()),
+        Some(line) => with_action(
+            warn(
+                ID,
+                LABEL,
+                line,
+                // The fix is intentionally just the path: the UI opens it in
+                // the user's editor rather than interpreting the crash.
+                Some(path.display().to_string()),
+            ),
+            DoctorAction::new("open-crash-log", "Open log"),
         ),
         None => ok(ID, LABEL, "No crash log entries.".to_string()),
     }
@@ -301,14 +354,17 @@ fn check_full_text_index(nodes: usize) -> DoctorCheck {
 
     let bytes = dir_size_bytes(&dir);
     if dir_is_empty(&dir) && nodes > 0 {
-        return fail(
-            ID,
-            LABEL,
-            format!(
-                "Index directory is empty while {} nodes are indexed.",
-                nodes
+        return with_action(
+            fail(
+                ID,
+                LABEL,
+                format!(
+                    "Index directory is empty while {} nodes are indexed.",
+                    nodes
+                ),
+                None,
             ),
-            Some("Run >reindex to rebuild the full-text index.".to_string()),
+            DoctorAction::new("reindex", "Rebuild the index"),
         );
     }
 
@@ -378,11 +434,9 @@ fn check_storage() -> DoctorCheck {
     // pruned at startup, but say so rather than leaving a user to wonder why
     // their profile keeps growing.
     if info.legacy_backups > 1 || info.update_temp_bytes > 0 {
-        return warn(
-            "storage",
-            "Data folder",
-            detail,
-            Some("Cleaned up automatically on the next launch.".to_string()),
+        return with_action(
+            warn("storage", "Data folder", detail, None),
+            DoctorAction::new("cleanup-storage", "Reclaim now"),
         );
     }
     ok("storage", "Data folder", detail)
@@ -566,11 +620,14 @@ fn check_watcher(state: &AppState) -> DoctorCheck {
         );
     }
 
-    warn(
-        ID,
-        LABEL,
-        "Watcher is not running and no scan is in progress.".to_string(),
-        Some("Run >reindex to restart the watcher.".to_string()),
+    with_action(
+        warn(
+            ID,
+            LABEL,
+            "Watcher is not running and no scan is in progress.".to_string(),
+            None,
+        ),
+        DoctorAction::new("restart-watcher", "Restart indexing"),
     )
 }
 
@@ -605,7 +662,6 @@ fn check_inotify_limit() -> DoctorCheck {
 fn check_models() -> DoctorCheck {
     const ID: &str = "models";
     const LABEL: &str = "Model files";
-    const FIX: &str = "Download model files in AI & Semantic";
 
     let status = models::status();
     let present = status.artifacts.iter().filter(|a| a.present).count();
@@ -630,16 +686,23 @@ fn check_models() -> DoctorCheck {
             .map(|a| a.name.clone())
             .collect::<Vec<_>>()
             .join(", ");
-        warn(
-            ID,
-            LABEL,
-            format!(
-                "Missing {} of {} artifacts: {}",
-                total - present,
-                total,
-                missing
+        // Semantic search falls back to hashing when the real model is absent,
+        // which returns plausible-looking results ranked on worthless vectors.
+        // The row offers the download instead of telling the user to find a
+        // button that does not exist in the AI & Semantic panel.
+        with_action(
+            warn(
+                ID,
+                LABEL,
+                format!(
+                    "Missing {} of {} artifacts: {}. Semantic search is using the hashing fallback until they are downloaded.",
+                    total - present,
+                    total,
+                    missing
+                ),
+                None,
             ),
-            Some(FIX.to_string()),
+            DoctorAction::new("download-models", "Download model files"),
         )
     }
 }
@@ -724,15 +787,18 @@ fn check_ocr_pack() -> DoctorCheck {
                 Some(problem) => warn(ID, LABEL, format!("installed, but {problem}"), None),
             }
         } else {
-            warn(
-                ID,
-                LABEL,
-                format!(
-                    "Indra OCR is selected but {} of {} artifacts are missing.",
-                    total - present,
-                    total
+            with_action(
+                warn(
+                    ID,
+                    LABEL,
+                    format!(
+                        "Indra OCR is selected but {} of {} artifacts are missing.",
+                        total - present,
+                        total
+                    ),
+                    None,
                 ),
-                Some("Download the Indra OCR pack in Settings → Search".to_string()),
+                DoctorAction::new("download-indra-pack", "Download Indra OCR pack"),
             )
         }
     } else if crate::ocr::engine_name() == crate::ocr::ACCURATE {
@@ -753,15 +819,18 @@ fn check_ocr_pack() -> DoctorCheck {
                 Some(problem) => warn(ID, LABEL, format!("installed, but {problem}"), None),
             }
         } else {
-            warn(
-                ID,
-                LABEL,
-                format!(
-                    "Accurate PP-OCR is selected but {} of {} artifacts are missing.",
-                    total - present,
-                    total
+            with_action(
+                warn(
+                    ID,
+                    LABEL,
+                    format!(
+                        "Accurate PP-OCR is selected but {} of {} artifacts are missing.",
+                        total - present,
+                        total
+                    ),
+                    None,
                 ),
-                Some("Download the accurate OCR pack in Settings → Search".to_string()),
+                DoctorAction::new("download-ocr-pack", "Download PP-OCR pack"),
             )
         }
     } else {

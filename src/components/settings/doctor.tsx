@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useTranslation } from "react-i18next";
-import { Bug, Check, Copy, Stethoscope } from "lucide-react";
+import { Bug, Check, Copy, Loader2, Stethoscope, Wrench } from "lucide-react";
 import { openGitHubBugReport } from "../../lib/githubIssue";
 import { DoctorCheck, DoctorReport } from "../../types";
 import { Card } from "./kit";
@@ -43,6 +43,12 @@ export function DoctorSection() {
   const [report, setReport] = useState<DoctorReport | null>(null);
   const [copied, setCopied] = useState(false);
   const [copiedFix, setCopiedFix] = useState<string | null>(null);
+  /* One repair at a time, and the outcome shown inline: a button that does
+     something invisible is worse than no button. */
+  const [runningAction, setRunningAction] = useState<string | null>(null);
+  const [actionResult, setActionResult] = useState<{ id: string; ok: boolean; text: string } | null>(
+    null,
+  );
   const [reported, setReported] = useState(false);
 
   const run = useCallback(() => {
@@ -80,6 +86,27 @@ export function DoctorSection() {
       console.error("Copy failed:", err);
     }
   }, []);
+
+  const runAction = useCallback(
+    async (checkId: string, kind: string) => {
+      setRunningAction(kind);
+      setActionResult(null);
+      try {
+        const message = await invoke<string>("run_doctor_action", { action: kind });
+        setActionResult({ id: checkId, ok: true, text: message });
+        // Re-run the checks so the row reflects the repair rather than the
+        // state that prompted it.
+        invoke<DoctorReport>("run_doctor")
+          .then(setReport)
+          .catch(() => undefined);
+      } catch (err) {
+        setActionResult({ id: checkId, ok: false, text: String(err) });
+      } finally {
+        setRunningAction(null);
+      }
+    },
+    [],
+  );
 
   const handleReportGitHub = useCallback(async () => {
     const { copied } = await openGitHubBugReport({ report });
@@ -220,6 +247,41 @@ export function DoctorSection() {
                 {c.detail && (
                   <p className="break-words text-[12px] leading-[18px] text-muted">{c.detail}</p>
                 )}
+                {/* A repair the check knows how to run. Rendered before the
+                    fix text, because doing it beats copying instructions. */}
+                {c.action && (
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={runningAction !== null}
+                      onClick={() => runAction(c.id, c.action!.kind)}
+                      className="btn btn-secondary h-7 px-2.5 text-[11px]"
+                    >
+                      {runningAction === c.action.kind ? (
+                        <>
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          {t("doctor.working")}
+                        </>
+                      ) : (
+                        <>
+                          <Wrench className="h-3 w-3" />
+                          {c.action.label}
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+
+                {actionResult?.id === c.id && (
+                  <p
+                    className={`mt-1 break-words text-[11px] leading-[16px] ${
+                      actionResult.ok ? "text-success" : "text-danger"
+                    }`}
+                  >
+                    {actionResult.text}
+                  </p>
+                )}
+
                 {c.fix && (
                   <div className="mt-1 flex min-w-0 items-start gap-1.5">
                     <code className="min-w-0 select-text break-all rounded bg-accent-soft px-1.5 py-0.5 font-mono text-[11px] text-muted">

@@ -463,6 +463,7 @@ pub fn run() {
             commands::run_doctor,
             commands::reset_all,
             commands::rebuild_index,
+            commands::run_doctor_action,
             commands::get_reset_pending,
             commands::get_autostart,
             commands::set_autostart,

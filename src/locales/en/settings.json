@@ -343,7 +343,8 @@
     "reportIssue": "Report on GitHub",
     "reportOpened": "Opening GitHub…",
     "reportTooltip": "Open a pre-filled issue report on GitHub",
-    "hasIssuesNotice": "Diagnostics flagged an issue. You can open a pre-filled bug report directly on GitHub."
+    "hasIssuesNotice": "Diagnostics flagged an issue. You can open a pre-filled bug report directly on GitHub.",
+    "working": "Working…"
   },
   "stats": {
     "polled": "polled from get_stats every 2 s",

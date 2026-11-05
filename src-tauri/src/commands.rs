@@ -1328,6 +1328,78 @@ pub fn last_query() -> String {
 /// The marker file is written now and consumed by `maybe_apply_pending_reset`
 /// before the restarted process opens the config, database or index. This keeps
 /// the removal ordering safe: no open handles exist when the directory is
+/// Runs the repair a Health check offers.
+///
+/// One entry point instead of a command per row: the check names an action,
+/// the UI posts that name back, and the backend maps it to the code that
+/// already exists. Unknown kinds are rejected rather than silently ignored, so
+/// a stale UI cannot look like a successful repair.
+#[tauri::command]
+pub async fn run_doctor_action(
+    action: String,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<String, String> {
+    match action.as_str() {
+        "download-models" => {
+            crate::models::download_models().await?;
+            Ok("Downloading model files. Semantic search upgrades when it finishes.".to_string())
+        }
+        "download-ocr-pack" => {
+            crate::models::download_ocr_pack();
+            Ok("Downloading the OCR pack.".to_string())
+        }
+        "download-indra-pack" => {
+            crate::models::download_indra_pack();
+            Ok("Downloading the Indra OCR pack.".to_string())
+        }
+        "cleanup-storage" => {
+            let report = crate::maintenance::cleanup_stale_artifacts();
+            Ok(format!(
+                "Reclaimed {}{}.",
+                crate::doctor::format_bytes(report.bytes_reclaimed),
+                if report.errors.is_empty() {
+                    String::new()
+                } else {
+                    format!(" ({} item(s) could not be removed)", report.errors.len())
+                }
+            ))
+        }
+        "restart-watcher" => {
+            // A fresh crawl restarts the watcher at its end, and re-reads
+            // anything that changed while it was down.
+            if state.daemon.is_some() {
+                return Err(
+                    "The index is owned by the Kensaku daemon. Restart it instead.".to_string(),
+                );
+            }
+            state.indexer.clone().rebuild_all()?;
+            Ok("Restarting indexing; the watcher comes back when the scan finishes.".to_string())
+        }
+        "reindex" => {
+            if state.daemon.is_some() {
+                return Err(
+                    "The index is owned by the Kensaku daemon. Restart it instead.".to_string(),
+                );
+            }
+            state.indexer.clone().rebuild_all()?;
+            Ok("Rebuilding the index.".to_string())
+        }
+        "open-crash-log" => {
+            let path = crate::crashlog::path();
+            if !path.is_file() {
+                return Err("The log file no longer exists.".to_string());
+            }
+            use tauri_plugin_opener::OpenerExt;
+            app.opener()
+                .open_path(path.display().to_string(), None::<&str>)
+                .map_err(|e| format!("Could not open the log: {e}"))?;
+            Ok("Opened the log.".to_string())
+        }
+        other => Err(format!("Unknown repair: {other}")),
+    }
+}
+
 /// deleted.
 #[tauri::command]
 pub async fn reset_all(

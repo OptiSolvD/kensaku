@@ -343,7 +343,8 @@
     "reportIssue": "在 GitHub 上反馈",
     "reportOpened": "正在打开 GitHub…",
     "reportTooltip": "在 GitHub 上打开预填的错误报告",
-    "hasIssuesNotice": "诊断检测到问题。您可以直接在 GitHub 上提交预填的错误报告。"
+    "hasIssuesNotice": "诊断检测到问题。您可以直接在 GitHub 上提交预填的错误报告。",
+    "working": "处理中…"
   },
   "stats": {
     "polled": "每 2 秒从 get_stats 轮询",
