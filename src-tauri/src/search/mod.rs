@@ -842,8 +842,9 @@ impl SearchDispatcher {
         // keystroke, which is the arena's whole purpose undone by the query
         // path. The store bumps `generation` on every mutation that can change
         // this list, so caching against it is a single comparison.
+        // Cached inside the store, per generation: see `entries_snapshot`.
         let generation = metadata.generation();
-        let entries = materialized_entries(metadata, generation);
+        let entries = metadata.entries_snapshot();
         let needs_trie = query_needs_trie(effective_query);
         let path_index: HashMap<PathBuf, usize> = if needs_trie {
             entries
@@ -1849,42 +1850,6 @@ impl CompiledFilter {
 
 // Removed: replaced by matches_all_compiled_filters + CompiledFilter
 
-/// The materialized entry list for one metadata generation.
-///
-/// One cache per generation, replaced wholesale when the store changes. The
-/// entries are immutable once built, so a query can hold them while another
-/// thread replaces the slot: the worst case is that this query uses a list
-/// that is one mutation old, which is what it would have read anyway without
-/// the cache.
-fn materialized_entries(
-    metadata: &MetadataStore,
-    generation: u64,
-) -> std::sync::Arc<Vec<FileEntry>> {
-    use std::sync::{Arc, Mutex, OnceLock};
-
-    static CACHE: OnceLock<Mutex<Option<(u64, Arc<Vec<FileEntry>>)>>> = OnceLock::new();
-    let cache = CACHE.get_or_init(|| Mutex::new(None));
-
-    if let Ok(guard) = cache.lock()
-        && let Some((cached_generation, entries)) = guard.as_ref()
-        && *cached_generation == generation
-    {
-        return Arc::clone(entries);
-    }
-
-    let built = Arc::new(
-        (0..metadata.len())
-            .into_par_iter()
-            .map(|index| metadata.materialize(index as u32))
-            .collect::<Vec<FileEntry>>(),
-    );
-
-    if let Ok(mut guard) = cache.lock() {
-        *guard = Some((generation, Arc::clone(&built)));
-    }
-    built
-}
-
 /// Case-insensitive substring test with no allocation on the ASCII path.
 ///
 /// These run once per file in the corpus on every filtered query, so a
@@ -2078,16 +2043,16 @@ mod tests {
         let mut store = MetadataStore::without_db();
         store.add(entry("/one.txt"));
 
-        let first = materialized_entries(&store, store.generation());
+        let first = store.entries_snapshot();
         assert_eq!(first.len(), 1);
 
         // Same generation: the cached list is reused, not rebuilt.
-        let again = materialized_entries(&store, store.generation());
+        let again = store.entries_snapshot();
         assert!(std::sync::Arc::ptr_eq(&first, &again));
 
         // A mutation bumps the generation, so the next query must see it.
         store.add(entry("/two.txt"));
-        let after = materialized_entries(&store, store.generation());
+        let after = store.entries_snapshot();
         assert_eq!(after.len(), 2, "a new entry must appear after a mutation");
         assert!(!std::sync::Arc::ptr_eq(&first, &after));
     }

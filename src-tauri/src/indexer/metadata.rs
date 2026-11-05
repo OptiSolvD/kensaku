@@ -20,6 +20,16 @@ pub struct MetadataStore {
     dir_generation: AtomicU64,
     usage: RwLock<HashMap<PathBuf, (u32, u64)>>,
     cached_trie: RwLock<Option<(u64, Arc<DirectoryTrie>)>>,
+    /// Materialized entries for the current generation.
+    ///
+    /// Building one is several allocations per file: the path is rebuilt from
+    /// the arena, a PathBuf is joined, the name is copied. Search needs the
+    /// whole list on every query, so it is cached here, per store, next to the
+    /// trie cache and invalidated the same way. Per store rather than global
+    /// because more than one store can exist in a process (the daemon, a
+    /// headless agent index, a test fixture), and a global cache would hand one
+    /// store's rows to another.
+    cached_entries: RwLock<Option<(u64, Arc<Vec<crate::indexer::walker::FileEntry>>)>>,
 }
 
 impl Default for MetadataStore {
@@ -40,6 +50,7 @@ impl MetadataStore {
             dir_generation: AtomicU64::new(1),
             usage: RwLock::new(HashMap::new()),
             cached_trie: RwLock::new(None),
+            cached_entries: RwLock::new(None),
         }
     }
 
@@ -709,6 +720,32 @@ impl MetadataStore {
 
     pub fn get_usage(&self, path: &Path) -> (u32, u64) {
         self.usage.read().get(path).copied().unwrap_or((0, 0))
+    }
+
+    /// The materialized entry list for the current generation.
+    ///
+    /// Returned behind an `Arc` of immutable rows, so a query can hold the list
+    /// while another thread mutates the store: the worst case is one query
+    /// seeing a list one generation old, which is what it read before the cache
+    /// existed.
+    pub fn entries_snapshot(&self) -> Arc<Vec<crate::indexer::walker::FileEntry>> {
+        let current_gen = self.generation.load(Ordering::SeqCst);
+        if let Ok(cache) = self.cached_entries.read()
+            && let Some((cached_gen, entries)) = cache.as_ref()
+            && *cached_gen == current_gen
+        {
+            return Arc::clone(entries);
+        }
+
+        let built = Arc::new(
+            (0..self.arena.len())
+                .map(|index| self.materialize(index as u32))
+                .collect::<Vec<_>>(),
+        );
+        if let Ok(mut cache) = self.cached_entries.write() {
+            *cache = Some((current_gen, Arc::clone(&built)));
+        }
+        built
     }
 
     pub fn get_directory_trie(&self) -> Arc<DirectoryTrie> {
