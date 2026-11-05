@@ -154,6 +154,11 @@ pub struct KensakuConfig {
     /// for speeding up the first scan on screenshot-heavy corpora. Default 0.
     #[serde(default)]
     pub ocr_max_image_bytes: u64,
+    /// Tesseract language codes, e.g. `["eng", "hin"]`. Empty means "use
+    /// English when installed". Previously Tesseract always ran as English
+    /// because `-l` was never passed, whatever the user had installed.
+    #[serde(default)]
+    pub ocr_languages: Vec<String>,
     /// Beta visual-search model pack. This only gates the Beta settings tab and
     /// model download; it is intentionally not wired into search yet.
     #[serde(default)]
@@ -452,6 +457,7 @@ impl Default for KensakuConfig {
             extractors: Vec::new(),
             ocr_enabled: true,
             ocr_max_image_bytes: 0,
+            ocr_languages: Vec::new(),
             ocr_engine: default_ocr_engine(),
             app_mode: default_app_mode(),
             theme: default_theme(),

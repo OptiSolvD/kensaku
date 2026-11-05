@@ -177,6 +177,8 @@ export interface KensakuConfig {
   skip_hidden?: boolean;
   ocr_enabled?: boolean;
   ocr_max_image_bytes?: number;
+  /** Tesseract language codes ("eng+Hindi" -> ["eng", "hin"]). Empty = auto. */
+  ocr_languages?: string[];
   ocr_engine?: OcrEngine;
   app_mode?: "launcher" | "app";
   theme?: "light" | "dark";

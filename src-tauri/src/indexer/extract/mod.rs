@@ -22,10 +22,28 @@ use std::time::{Duration, Instant};
 /// keeps the parallel extraction phase independent of the config `RwLock`.
 static OCR_ENABLED: AtomicBool = AtomicBool::new(true);
 
+/// Language codes to hand to Tesseract, mirroring
+/// [`crate::config::KensakuConfig::ocr_languages`]. Empty means "pick from the
+/// installed languages" (English first).
+static OCR_LANGUAGES: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
 /// Updates the process-wide OCR setting. Called whenever the config is loaded or
 /// saved so image indexing follows the user's choice immediately.
 pub fn set_ocr_enabled(enabled: bool) {
     OCR_ENABLED.store(enabled, Ordering::SeqCst);
+}
+
+pub fn set_ocr_languages(languages: Vec<String>) {
+    if let Ok(mut slot) = OCR_LANGUAGES.lock() {
+        *slot = languages;
+    }
+}
+
+pub fn ocr_languages() -> Vec<String> {
+    OCR_LANGUAGES
+        .lock()
+        .map(|languages| languages.clone())
+        .unwrap_or_default()
 }
 
 /// True when image OCR is allowed.

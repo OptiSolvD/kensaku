@@ -582,6 +582,42 @@ pub fn extract_image_ocr(path: &Path) -> Option<String> {
     }
 }
 
+/// Language argument for Tesseract, e.g. `eng+hin`.
+///
+/// Tesseract defaults to English when `-l` is absent, so a non-English corpus
+/// indexed as English garbage even though the installed language data was
+/// listed in Settings. The configured languages come from config; whatever
+/// they name has to exist in `--list-langs`, otherwise Tesseract fails the
+/// whole run.
+fn tesseract_lang_arg() -> Option<String> {
+    let status = tesseract_status();
+    let available = status.languages;
+
+    let configured = crate::indexer::extract::ocr_languages();
+    let mut chosen: Vec<String> = configured
+        .iter()
+        .map(|lang| lang.trim().to_ascii_lowercase())
+        .filter(|lang| !lang.is_empty())
+        .filter(|lang| available.iter().any(|have| have.eq_ignore_ascii_case(lang)))
+        .collect();
+
+    if chosen.is_empty() {
+        // No explicit setting (or none of it is installed): fall back to
+        // English when present, then to whatever single language exists.
+        if available.iter().any(|lang| lang.eq_ignore_ascii_case("eng")) {
+            chosen.push("eng".to_string());
+        } else if available.len() == 1 {
+            chosen.push(available[0].clone());
+        }
+    }
+
+    if chosen.is_empty() {
+        return None;
+    }
+    chosen.dedup();
+    Some(chosen.join("+"))
+}
+
 /// Runs Tesseract on an image file.
 fn tesseract_ocr(path: &Path) -> crate::ocr::OcrOutcome {
     use crate::ocr::OcrOutcome;
@@ -617,6 +653,12 @@ fn tesseract_ocr(path: &Path) -> crate::ocr::OcrOutcome {
         .args(["stdout", "--psm", "3"]) // Fully automatic page segmentation
         .stdout(Stdio::piped())
         .stderr(Stdio::null());
+
+    // Without `-l`, every image is read as English regardless of the language
+    // data the user installed.
+    if let Some(langs) = tesseract_lang_arg() {
+        command.arg("-l").arg(langs);
+    }
 
     // Prefer Kensaku's private language data when it has been downloaded, but
     // never override a working system installation.
