@@ -54,13 +54,6 @@ impl DoctorAction {
         }
     }
 
-    fn opening(kind: &str, label: &str, section: &str) -> Self {
-        Self {
-            kind: kind.to_string(),
-            label: label.to_string(),
-            section: Some(section.to_string()),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize)]
