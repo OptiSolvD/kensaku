@@ -836,13 +836,14 @@ impl SearchDispatcher {
             .unwrap_or(0);
 
         let trie = metadata.get_directory_trie();
-        // Materialization is allocation-heavy; parallelize it. Metadata order
-        // is the entry order, so `get_index` can resolve a path to its slot
-        // without cloning every path into a hash map.
-        let entries: Vec<FileEntry> = (0..metadata.len())
-            .into_par_iter()
-            .map(|i| metadata.materialize(i as u32))
-            .collect();
+        // Materializing a FileEntry reconstructs the path from the node arena,
+        // joins a PathBuf and copies the name: several allocations per file,
+        // for every query. On a 25k-file corpus that is ~100k allocations per
+        // keystroke, which is the arena's whole purpose undone by the query
+        // path. The store bumps `generation` on every mutation that can change
+        // this list, so caching against it is a single comparison.
+        let generation = metadata.generation();
+        let entries = materialized_entries(metadata, generation);
         let needs_trie = query_needs_trie(effective_query);
         let path_index: HashMap<PathBuf, usize> = if needs_trie {
             entries
@@ -853,7 +854,6 @@ impl SearchDispatcher {
         } else {
             HashMap::new()
         };
-        let generation = metadata.generation();
         // Prefer the store's path index. Some synthetic/partial stores (for
         // example a fixture that inserts files without their parent
         // directories) cannot resolve every path, so build a fallback map from
@@ -1849,6 +1849,42 @@ impl CompiledFilter {
 
 // Removed: replaced by matches_all_compiled_filters + CompiledFilter
 
+/// The materialized entry list for one metadata generation.
+///
+/// One cache per generation, replaced wholesale when the store changes. The
+/// entries are immutable once built, so a query can hold them while another
+/// thread replaces the slot: the worst case is that this query uses a list
+/// that is one mutation old, which is what it would have read anyway without
+/// the cache.
+fn materialized_entries(
+    metadata: &MetadataStore,
+    generation: u64,
+) -> std::sync::Arc<Vec<FileEntry>> {
+    use std::sync::{Arc, Mutex, OnceLock};
+
+    static CACHE: OnceLock<Mutex<Option<(u64, Arc<Vec<FileEntry>>)>>> = OnceLock::new();
+    let cache = CACHE.get_or_init(|| Mutex::new(None));
+
+    if let Ok(guard) = cache.lock()
+        && let Some((cached_generation, entries)) = guard.as_ref()
+        && *cached_generation == generation
+    {
+        return Arc::clone(entries);
+    }
+
+    let built = Arc::new(
+        (0..metadata.len())
+            .into_par_iter()
+            .map(|index| metadata.materialize(index as u32))
+            .collect::<Vec<FileEntry>>(),
+    );
+
+    if let Ok(mut guard) = cache.lock() {
+        *guard = Some((generation, Arc::clone(&built)));
+    }
+    built
+}
+
 /// Case-insensitive substring test with no allocation on the ASCII path.
 ///
 /// These run once per file in the corpus on every filtered query, so a
@@ -2019,6 +2055,41 @@ mod tests {
             group_count: 1,
             group_paths: Vec::new(),
         }
+    }
+
+    #[test]
+    fn cached_entries_follow_the_store_generation() {
+        use crate::indexer::walker::FileEntry;
+
+        let entry = |path: &str| FileEntry {
+            id: 0,
+            path: PathBuf::from(path),
+            name: path.rsplit('/').next().unwrap_or(path).to_string(),
+            extension: None,
+            size: 1,
+            modified: 1,
+            is_dir: false,
+            dev: 0,
+            ino: 0,
+            char_bloom: 0,
+            content_pending: false,
+        };
+
+        let mut store = MetadataStore::without_db();
+        store.add(entry("/one.txt"));
+
+        let first = materialized_entries(&store, store.generation());
+        assert_eq!(first.len(), 1);
+
+        // Same generation: the cached list is reused, not rebuilt.
+        let again = materialized_entries(&store, store.generation());
+        assert!(std::sync::Arc::ptr_eq(&first, &again));
+
+        // A mutation bumps the generation, so the next query must see it.
+        store.add(entry("/two.txt"));
+        let after = materialized_entries(&store, store.generation());
+        assert_eq!(after.len(), 2, "a new entry must appear after a mutation");
+        assert!(!std::sync::Arc::ptr_eq(&first, &after));
     }
 
     /// Run with `cargo test --release --lib burst_grouping_cost -- --ignored --nocapture`.

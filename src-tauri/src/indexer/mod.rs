@@ -528,6 +528,26 @@ impl IndexerManager {
         }
     }
 
+    /// Holds extraction while the user is searching.
+    ///
+    /// A crawl uses every core it can, and a search that arrives mid-crawl
+    /// competes with 2-8 extraction threads for them, which is why the app
+    /// felt worst exactly when it was doing the most work. The phash backfill
+    /// already yields this way; the extraction pool did not.
+    ///
+    /// Polling rather than blocking on a condition variable: a flag left set
+    /// by a panic in the query path costs a slower crawl, never a hung one.
+    fn yield_to_queries(query_in_flight: &Arc<AtomicBool>) {
+        if !query_in_flight.load(Ordering::Relaxed) {
+            return;
+        }
+        // Long enough for the query to finish, short enough that the crawl
+        // resumes immediately after it.
+        while query_in_flight.load(Ordering::Relaxed) {
+            thread::sleep(Duration::from_millis(25));
+        }
+    }
+
     /// Eco mode limits how often extraction jobs start while on battery.
     /// Documents already in flight finish normally; fresh watcher events are
     /// handled by the watcher thread and are not paced.
@@ -871,6 +891,7 @@ impl IndexerManager {
             let producer_config = Arc::clone(&config_arc);
             let battery_state = Arc::new(Mutex::new((Instant::now(), false)));
             let pace_gate = Arc::new(Mutex::new(Instant::now()));
+            let producer_query_flag = Arc::clone(&query_in_flight);
 
             rayon::scope(|scope| {
                 use rayon::prelude::*;
@@ -878,6 +899,9 @@ impl IndexerManager {
                 scope.spawn(move |_| {
                     to_extract.par_iter().for_each_with(tx, |tx, job| {
                         Self::wait_while_paused(&producer_config, &producer_status, &producer_app);
+                        // Search comes first: a user waiting on results must not
+                        // queue behind a background scan.
+                        Self::yield_to_queries(&producer_query_flag);
                         Self::pace_on_battery(&producer_config, &battery_state, &pace_gate);
 
                         // Image dimensions come from the file header, which is
