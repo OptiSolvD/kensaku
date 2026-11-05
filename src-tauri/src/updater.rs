@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::io::Read;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
@@ -145,6 +146,18 @@ pub fn get_status() -> UpdateStatus {
     status_slot().lock().unwrap().clone()
 }
 
+/// Every network call the updater makes is bounded. Without a timeout a
+/// stalled connection left the download flag set forever, and every later
+/// attempt was refused as "busy" until the process restarted.
+const METADATA_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+const DOWNLOAD_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(600);
+/// Read timeout for a single socket read during the asset download.
+const DOWNLOAD_READ_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
+
+/// Browser URL of the release's `SHA256SUMS` asset, captured during the
+/// metadata check. `None` when the release does not publish one.
+static SUMS_URL: Mutex<Option<String>> = Mutex::new(None);
+
 /// Checks GitHub for the latest release metadata.
 pub fn check_for_update() -> Result<UpdateInfo, String> {
     let current_version = env!("CARGO_PKG_VERSION");
@@ -152,10 +165,19 @@ pub fn check_for_update() -> Result<UpdateInfo, String> {
 
     let resp: GitHubRelease = ureq::get(url)
         .set("User-Agent", &format!("kensaku-updater/{}", current_version))
+        .timeout(METADATA_TIMEOUT)
         .call()
         .map_err(|e| format!("Failed to reach GitHub release API: {e}"))?
         .into_json()
         .map_err(|e| format!("Failed to parse release information: {e}"))?;
+
+    if let Ok(mut slot) = SUMS_URL.lock() {
+        *slot = resp
+            .assets
+            .iter()
+            .find(|asset| asset.name.eq_ignore_ascii_case("SHA256SUMS"))
+            .map(|asset| asset.browser_download_url.clone());
+    }
 
     let latest_tag = resp.tag_name.trim_start_matches('v');
     let has_update = is_newer_version(latest_tag, current_version);
@@ -175,8 +197,89 @@ pub fn check_for_update() -> Result<UpdateInfo, String> {
     })
 }
 
+/// True when this install is the portable build (a `portable` marker file
+/// sits next to the executable).
+///
+/// A portable install must not run the installer: it would place a second
+/// copy in Program Files while the portable folder - and the index inside it -
+/// stayed exactly as it was, so the user is told they updated and nothing
+/// they are running actually changed.
+pub fn is_portable_install() -> bool {
+    let Ok(exe) = std::env::current_exe() else {
+        return false;
+    };
+    let Some(dir) = exe.parent() else {
+        return false;
+    };
+    dir.join("portable").is_file() || dir.join("kensaku.portable").is_file()
+}
+
+/// Expected SHA-256 for `asset_name` from the release's `SHA256SUMS`.
+///
+/// Returns `Ok(None)` when the release publishes no checksum file or does not
+/// list this asset: an older tag must still be installable.
+fn expected_sha256(asset_name: &str) -> Result<Option<String>, String> {
+    let url = match SUMS_URL.lock() {
+        Ok(guard) => guard.clone(),
+        Err(_) => None,
+    };
+    let Some(url) = url else {
+        return Ok(None);
+    };
+
+    let body = ureq::get(&url)
+        .set(
+            "User-Agent",
+            &format!("kensaku-updater/{}", env!("CARGO_PKG_VERSION")),
+        )
+        .timeout(METADATA_TIMEOUT)
+        .call()
+        .map_err(|e| format!("Could not fetch checksums: {e}"))?
+        .into_string()
+        .map_err(|e| format!("Could not read checksums: {e}"))?;
+
+    for line in body.lines() {
+        // "<sha256>  <filename>" (binary mode) or "<sha256> <filename>".
+        let mut parts = line.split_whitespace();
+        let (Some(hash), Some(name)) = (parts.next(), parts.next()) else {
+            continue;
+        };
+        let name = name.trim_start_matches('*');
+        if name == asset_name {
+            return Ok(Some(hash.to_ascii_lowercase()));
+        }
+    }
+    Ok(None)
+}
+
+fn sha256_of(path: &std::path::Path) -> Result<String, String> {
+    use sha2::{Digest, Sha256};
+    let mut file = std::fs::File::open(path).map_err(|e| format!("Could not open download: {e}"))?;
+    let mut hasher = Sha256::new();
+    let mut buf = [0u8; 64 * 1024];
+    loop {
+        let read = file
+            .read(&mut buf)
+            .map_err(|e| format!("Could not read download: {e}"))?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buf[..read]);
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
 /// Initiates download of the chosen asset in a background worker thread.
 pub fn download_update(asset_url: &str, asset_name: &str) -> Result<UpdateStatus, String> {
+    if is_portable_install() {
+        return Err(
+            "This is a portable install: update by replacing the folder with the new portable zip. \
+             In-app updates are disabled so the running copy is never silently replaced by a \
+             second install."
+                .to_string(),
+        );
+    }
+
     if DOWNLOADING.swap(true, Ordering::SeqCst) {
         return Ok(get_status());
     }
@@ -209,6 +312,7 @@ pub fn download_update(asset_url: &str, asset_name: &str) -> Result<UpdateStatus
     }
 
     let url = asset_url.to_string();
+    let asset_name_for_check = asset_name.to_string();
 
     std::thread::Builder::new()
         .name("kensaku-updater".to_string())
@@ -216,6 +320,8 @@ pub fn download_update(asset_url: &str, asset_name: &str) -> Result<UpdateStatus
             let res = (|| -> Result<(), String> {
                 let resp = ureq::get(&url)
                     .set("User-Agent", &format!("kensaku-updater/{}", env!("CARGO_PKG_VERSION")))
+                    .timeout(DOWNLOAD_TIMEOUT)
+                    .timeout_read(DOWNLOAD_READ_TIMEOUT)
                     .call()
                     .map_err(|e| format!("Download request failed: {e}"))?;
 
@@ -254,6 +360,30 @@ pub fn download_update(asset_url: &str, asset_name: &str) -> Result<UpdateStatus
                         total: total_bytes,
                         percent,
                     });
+                }
+
+                // A body that ends early reads as a clean EOF, so the loop
+                // above cannot tell a finished download from a dropped
+                // connection. Renaming the .part file unconditionally marked
+                // a truncated installer as ready and the user ran it.
+                if total_bytes > 0 && downloaded != total_bytes {
+                    let _ = std::fs::remove_file(&part_path);
+                    return Err(format!(
+                        "Download incomplete: got {downloaded} of {total_bytes} bytes"
+                    ));
+                }
+
+                // Verify against the release's published checksum before the
+                // file is ever executable. The workflow already publishes
+                // SHA256SUMS; the updater used to ignore it entirely.
+                if let Some(expected) = expected_sha256(&asset_name_for_check)? {
+                    let actual = sha256_of(&part_path)?;
+                    if actual != expected {
+                        let _ = std::fs::remove_file(&part_path);
+                        return Err(format!(
+                            "Update failed verification: expected {expected}, got {actual}"
+                        ));
+                    }
                 }
 
                 let _ = std::fs::remove_file(&final_path);

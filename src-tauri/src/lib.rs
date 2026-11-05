@@ -37,13 +37,36 @@ pub struct AppState {
 /// Owns the single-instance lock for the whole process lifetime: the OS releases
 /// the advisory lock when the process exits, and dropping the `File` earlier
 /// would let a second instance start.
-static INSTANCE_LOCK: OnceLock<std::fs::File> = OnceLock::new();
+static INSTANCE_LOCK: OnceLock<std::sync::Mutex<Option<std::fs::File>>> = OnceLock::new();
 
-fn instance_lock_path() -> PathBuf {
-    KensakuConfig::config_dir().join("kensaku.lock")
+/// Releases the single-instance lock so the next process can take it.
+///
+/// `AppHandle::restart()` spawns the replacement process before this one
+/// exits. A process that still holds the lock makes the fresh instance lose
+/// the race and quit, which is how a reset could close the app and never
+/// bring it back. Called only on an explicit, user-confirmed reset.
+pub fn release_instance_lock() {
+    if let Some(slot) = INSTANCE_LOCK.get()
+        && let Ok(mut guard) = slot.lock()
+    {
+        // Dropping the handle releases the OS lock; removing the file keeps a
+        // stale inode from confusing the next startup.
+        *guard = None;
+    }
+    let _ = std::fs::remove_file(instance_lock_path());
 }
 
-/// Tries to take the process-wide exclusive lock on `<config_dir>/kensaku.lock`.
+/// The GUI's own lock, separate from `kensaku.lock`.
+///
+/// `kensaku.lock` belongs to whichever process owns the index (the daemon when
+/// it runs). The GUI used to skip locking entirely in that case, so two
+/// windows, two trays and two shortcut registrations could coexist and
+/// `--toggle` booted a second app instead of summoning the first.
+fn instance_lock_path() -> PathBuf {
+    KensakuConfig::config_dir().join("kensaku-gui.lock")
+}
+
+/// Tries to take the GUI exclusive lock on `<config_dir>/kensaku-gui.lock`.
 ///
 /// * `Ok(Some(file))` — acquired; the caller must keep `file` alive.
 /// * `Ok(None)` — another instance already holds the lock.
@@ -225,20 +248,12 @@ pub fn run() {
     #[cfg(not(unix))]
     let daemon_available = false;
 
-    // The daemon owns the single-instance lock and the writer. The GUI only
-    // takes it in the explicit fallback mode.
-    let mut instance_lock = if daemon_available {
-        None
-    } else {
-        acquire_instance_lock_or_exit()
-    };
-
-    if instance_lock.is_some() && !instance_lock_path().exists() {
-        instance_lock = acquire_instance_lock_or_exit();
-    }
+    // The GUI always takes its own lock, daemon or not. The daemon lock is a
+    // different file: it guards the index owner, not the window.
+    let instance_lock = acquire_instance_lock_or_exit();
 
     if let Some(file) = instance_lock {
-        let _ = INSTANCE_LOCK.set(file);
+        let _ = INSTANCE_LOCK.set(std::sync::Mutex::new(Some(file)));
     }
 
     let config = KensakuConfig::load();

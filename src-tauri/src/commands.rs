@@ -1341,6 +1341,12 @@ pub async fn reset_all(app: AppHandle, confirm: String) -> Result<(), String> {
     let marker = dir.join(".reset-requested");
     std::fs::write(&marker, b"1").map_err(|e| format!("Failed to write reset marker: {}", e))?;
 
+    // The replacement process starts before this one exits, so the instance
+    // lock has to be handed over first. Without this the fresh instance lost
+    // the race, printed "another instance is running" and quit: the app closed
+    // and the reset never ran.
+    crate::release_instance_lock();
+
     // Never returns: the process exits and relaunches, and the fresh process
     // applies the pending reset before constructing any application state.
     app.restart();
