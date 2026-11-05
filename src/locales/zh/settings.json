@@ -281,9 +281,14 @@
     "downloadingSetup": "正在设置中下载…",
     "retryHint": "使用 关于 → 重新运行设置向导 重试下载。",
     "ready": "模型文件已就绪",
-    "notDownloaded": "尚未下载。使用 关于 → 重新运行设置向导 获取可选的神经层。",
+    "notDownloaded": "尚未下载。共 29.5 MB；在此之前语义搜索使用哈希回退。",
     "notDownloadedBold": "关于 → 重新运行设置向导",
-    "note": "默认语义层已内置。这些文件会预取可选的神经层以供离线使用。"
+    "note": "默认语义层已内置。这些文件会预取可选的神经层以供离线使用。",
+    "download": "下载",
+    "starting": "开始中…",
+    "delete": "删除文件",
+    "deleteHint": "删除已下载的模型文件以释放空间。",
+    "notDownloadedTitle": "模型文件缺失"
   },
   "ocr": {
     "title": "OCR（图片）",

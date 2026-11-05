@@ -281,9 +281,14 @@
     "downloadingSetup": "downloading in setup…",
     "retryHint": "Use About → Run setup again to retry the download.",
     "ready": "Model files ready",
-    "notDownloaded": "Not downloaded. Use About → Run setup again to acquire the optional neural tier.",
+    "notDownloaded": "Not downloaded. 29.5 MB in total; semantic search uses a hashing fallback until then.",
     "notDownloadedBold": "About → Run setup again",
-    "note": "The default semantic tier is built in. These files pre-fetch the optional neural tier for offline use."
+    "note": "The default semantic tier is built in. These files pre-fetch the optional neural tier for offline use.",
+    "download": "Download",
+    "starting": "Starting…",
+    "delete": "Delete files",
+    "deleteHint": "Delete the downloaded model files to reclaim space.",
+    "notDownloadedTitle": "Model files are missing"
   },
   "ocr": {
     "title": "OCR (images)",

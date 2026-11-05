@@ -42,6 +42,41 @@ export function ModelFilesCard() {
     return () => window.clearInterval(id);
   }, [live, status?.downloading, load]);
 
+  /* Downloading is not only a setup step. This card used to say "downloads
+     live in setup" and point at About -> Run setup again, which resets the
+     whole wizard just to fetch 30 MB. Failures during setup were also silent
+     (a console warning), so a missing model looked like nothing had happened.
+     The button here is the retry the copy always promised. */
+  const [busy, setBusy] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const startDownload = useCallback(async () => {
+    setBusy("download");
+    setActionError(null);
+    try {
+      await invoke("download_models");
+      // Progress arrives through the status poll above.
+      load();
+    } catch (err) {
+      setActionError(String(err));
+    } finally {
+      setBusy(null);
+    }
+  }, [load]);
+
+  const removeModels = useCallback(async () => {
+    setBusy("delete");
+    setActionError(null);
+    try {
+      await invoke("delete_models");
+      load();
+    } catch (err) {
+      setActionError(String(err));
+    } finally {
+      setBusy(null);
+    }
+  }, [load]);
+
   const copyDir = useCallback(async () => {
     if (!status?.dir) return;
     try {
@@ -144,10 +179,40 @@ export function ModelFilesCard() {
           <p className="text-[12px] font-medium text-fg">{t("models.ready")}</p>
         </div>
       ) : (
-        <div className="border-t border-line px-4 py-3">
-          <p className="text-[12px] leading-[18px] text-muted">
-            {t("models.notDownloaded")}
+        <div className="flex items-center justify-between gap-4 border-t border-line px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-[12px] font-medium text-fg">{t("models.notDownloadedTitle")}</p>
+            <p className="pt-0.5 text-[12px] leading-[18px] text-muted">
+              {t("models.notDownloaded")}
+            </p>
+            {actionError && (
+              <p className="pt-1 break-words text-[11px] text-danger">{actionError}</p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={startDownload}
+            disabled={busy !== null}
+            className="btn btn-primary h-8 shrink-0 px-3 text-[11px]"
+          >
+            {busy === "download" ? t("models.starting") : t("models.download")}
+          </button>
+        </div>
+      )}
+
+      {status?.ready && (
+        <div className="flex items-center justify-between gap-4 border-t border-line px-4 py-3">
+          <p className="min-w-0 text-[12px] leading-[18px] text-muted">
+            {t("models.deleteHint")}
           </p>
+          <button
+            type="button"
+            onClick={removeModels}
+            disabled={busy !== null}
+            className="h-7 shrink-0 rounded-control border border-line px-2.5 text-[11px] font-medium text-muted transition-colors hover:text-danger"
+          >
+            {t("models.delete")}
+          </button>
         </div>
       )}
 
