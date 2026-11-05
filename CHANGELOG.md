@@ -3,6 +3,26 @@
 All notable changes to Kensaku. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning: [SemVer](https://semver.org/).
 
+## [1.0.17] — 2026-11-05
+
+### Fixed
+- **Typing only registered the first character.** The toolbar holding the sort control renders
+  only once a query has results, so it mounted on the first keystroke; the focus handler added
+  with the in-app sort listbox ran on mount and moved the caret to the sort button. Focus is now
+  returned to the trigger only when the list actually closes. Covered by a DOM test that fails
+  against 1.0.16.
+- **Indexing appeared to run on every launch, forever.** A file whose extraction timed out, or
+  whose extraction slot was busy, was marked pending and re-read on the next crawl with no
+  limit. A file that always failed was therefore re-decoded on every single launch and the
+  crawl never settled. Retries are now capped at 3 and reset when the file changes or OCR
+  settings change.
+
+### Added
+- **Indexing is visible from the settings panel.** A horizontal bar at the top of Settings
+  shows the phase (checking folders, indexing, embedding, saving), the file counts and a
+  progress bar while a scan runs. Previously a scan started while Settings was open was
+  invisible, because the panel covers the status line in the main window.
+
 ## [1.0.16] — 2026-11-05
 
 ### Fixed
