@@ -57,13 +57,22 @@ export function ResultControls({
   }, [open]);
 
   // Keep the highlight on the current value each time the list opens, and
-  // park focus back on the trigger when it closes so keyboard users are not
+  // return focus to the trigger when it closes so a keyboard user is not
   // dropped onto the page body.
+  //
+  // Only on a close, never on mount. This component mounts when the first
+  // results arrive, and an unconditional `.focus()` on mount yanks focus out
+  // of the search box mid-typing: the first character landed, then the caret
+  // was gone. `wasOpen` makes the effect run only on an actual transition.
+  const wasOpen = useRef(false);
   useEffect(() => {
+    const justClosed = wasOpen.current && !open;
+    wasOpen.current = open;
+
     if (open) {
       setActiveIndex(Math.max(0, SORT_OPTIONS.findIndex((o) => o.value === sort)));
       listRef.current?.focus({ preventScroll: true });
-    } else {
+    } else if (justClosed) {
       buttonRef.current?.focus({ preventScroll: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
