@@ -208,16 +208,30 @@ fn run_watcher(
         }
     };
 
-    watcher_ok.store(true, Ordering::SeqCst);
-
-    for dir in &watched_dirs {
-        if dir.exists() {
-            if let Err(e) = watcher.watch(dir, RecursiveMode::Recursive) {
-                eprintln!("[Kensaku Watcher] Failed to watch {}: {}", dir.display(), e);
-            } else {
-                println!("[Kensaku Watcher] Watching {}", dir.display());
+    // Report live indexing only once a watch is actually registered. The flag
+    // used to be set before the loop, so an exhausted inotify limit, a
+    // network mount or a denied FSEvents subscription still looked healthy
+    // while nothing was being watched.
+    let mut registered = 0usize;
+    for root in &watched_dirs {
+        if !root.exists() {
+            continue;
+        }
+        match watcher.watch(root, RecursiveMode::Recursive) {
+            Ok(()) => {
+                registered += 1;
+                println!("[Kensaku Watcher] Watching {}", root.display());
+            }
+            Err(error) => {
+                eprintln!(
+                    "[Kensaku Watcher] Failed to watch {}: {}",
+                    root.display(),
+                    error
+                );
             }
         }
+    }
+    watcher_ok.store(registered > 0, Ordering::SeqCst);
     }
 
     let mut pending = PendingUpserts::default();
