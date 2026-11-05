@@ -123,7 +123,7 @@ export function IndexingBanner() {
     <div
       role="status"
       aria-live="polite"
-      className="relative flex shrink-0 items-center gap-3 border-b border-line bg-accent-soft px-4 py-2"
+      className="relative flex w-full shrink-0 items-center gap-3 border-t border-line bg-accent-soft px-4 py-2"
     >
       <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-muted" strokeWidth={2} />
       <div className="min-w-0 flex-1">

@@ -201,12 +201,7 @@ export function Settings({ onClose, initialSection, onConfigSaved }: SettingsPro
         >
           <X className="h-4 w-4" strokeWidth={1.75} />
         </button>
-        {/* Indexing is announced at the top of the panel: the main window's
-            status line is hidden behind this overlay, so a scan started here
-            was completely invisible. In flow rather than overlaid, so it never
-            covers the first row of settings. */}
-        <IndexingBanner />
-        <div className="relative min-h-0 flex-1 overflow-y-auto px-6 pb-20 pt-6" style={{ scrollbarGutter: "stable" }}>
+        <div className="relative min-h-0 flex-1 overflow-y-auto px-6 pb-6 pt-6" style={{ scrollbarGutter: "stable" }}>
           <div className="mx-auto max-w-[640px]">
             {config ? (
               <SectionShell section={section}>{renderSection(section, config, setConfig)}</SectionShell>
@@ -216,8 +211,8 @@ export function Settings({ onClose, initialSection, onConfigSaved }: SettingsPro
           </div>
         </div>
 
-        <footer className="pointer-events-none absolute inset-x-0 bottom-5 z-10 flex justify-center">
-          <div className="control pointer-events-auto flex items-center gap-2 rounded-full py-1.5 pl-4 pr-1.5">
+        <footer className="relative z-10 flex shrink-0 flex-col gap-2 pb-3">
+          <div className="control mx-auto flex items-center gap-2 rounded-full py-1.5 pl-4 pr-1.5">
             <span className="flex items-center gap-2 pr-2 text-[12px] text-muted">
               <span className={`h-1.5 w-1.5 shrink-0 rounded-full transition-colors ${dirty ? "bg-warning" : "bg-success/70"}`} />
               {dirty ? t("footer.unsaved") : saved ? t("footer.saved") : t("footer.upToDate")}
@@ -231,6 +226,12 @@ export function Settings({ onClose, initialSection, onConfigSaved }: SettingsPro
               {saved ? t("footer.saved") : saving ? t("footer.saving") : t("footer.save")}
             </button>
           </div>
+
+          {/* Indexing is announced at the bottom of the panel. The top edge is
+              where the close button lives, and the main window's status line is
+              hidden behind this overlay, so this is the one place a running
+              scan can be seen without getting in the way. */}
+          <IndexingBanner />
         </footer>
         {discardOpen && (
           <DiscardDialog
