@@ -15,7 +15,7 @@
 macro_rules! say {
     ($($arg:tt)*) => {{
         use ::std::io::Write as _;
-        let _ = ::std::io::writeln!(::std::io::stdout(), $($arg)*);
+        let _ = ::std::writeln!(::std::io::stdout(), $($arg)*);
     }};
 }
 
@@ -24,6 +24,6 @@ macro_rules! say {
 macro_rules! say_err {
     ($($arg:tt)*) => {{
         use ::std::io::Write as _;
-        let _ = ::std::io::writeln!(::std::io::stderr(), $($arg)*);
+        let _ = ::std::writeln!(::std::io::stderr(), $($arg)*);
     }};
 }
