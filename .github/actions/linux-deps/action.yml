@@ -1,21 +1,26 @@
 name: Linux build dependencies
 description: >
-  Install the GTK/WebKit packages Tauri needs to compile on Linux, with a bounded,
-  cached download.
+  Install the GTK/WebKit packages Tauri needs to compile on Linux, with bounded
+  waits and cached archives.
 
 # Why this exists rather than an inline apt-get in each workflow:
 #
-# The step used to be `apt-get update` plus `apt-get install -y`, repeated in every
-# Linux job. That pulls 135 packages and 55.5 MB of archives per job, per run, from
-# the shared Ubuntu mirror. On a good run it takes about 25 seconds. When the mirror
-# stalls it took 8m56s once and over 30 minutes on another run, because apt has no
-# timeout of its own and will wait indefinitely on a stuck connection.
+# The step installs 135 packages, 55.5 MB of archives. Normally that takes about
+# 25 seconds. Observed durations on this repo: 26s, 24s, 61s, 36s, then 8m36s,
+# then over 30 minutes and still running. Two separate causes make that possible,
+# and neither is the download itself (55 MB does not take 30 minutes):
 #
-# Three changes keep it predictable:
-#   - the downloaded archives are cached, so only a cache miss downloads them;
-#   - acquisitions have a timeout and retries, so a stalled mirror retries instead
-#     of hanging the job;
-#   - recommends are skipped, which is fewer packages for the same build.
+#   1. The dpkg/apt lock. A fresh runner runs cloud-init and unattended-upgrades
+#      at boot, which hold the package locks. apt then waits for the lock with no
+#      timeout and prints nothing while it waits.
+#   2. A stalled mirror connection. apt's default acquisition wait is effectively
+#      unbounded.
+#
+# So this step: waits for cloud-init to finish, bounds the lock wait explicitly,
+# bounds each apt invocation with `timeout`, retries transient network failures,
+# caches the .deb archives so steady-state runs download nothing, and prints a
+# timestamped line per phase so a future stall is attributable from the log
+# instead of guessed at.
 runs:
   using: composite
   steps:
@@ -23,7 +28,6 @@ runs:
       uses: actions/cache@v4
       with:
         path: /var/cache/apt/archives
-        # Keyed on this file, so changing the package list invalidates the cache.
         key: apt-archives-${{ runner.os }}-${{ hashFiles('.github/actions/linux-deps/action.yml') }}
         restore-keys: |
           apt-archives-${{ runner.os }}-
@@ -32,17 +36,31 @@ runs:
       shell: bash
       env:
         DEBIAN_FRONTEND: noninteractive
-        # Fail a stalled connection after 20s and retry, instead of waiting forever.
+        NEEDRESTART_MODE: a
+        # Bound every wait instead of inheriting apt's unbounded defaults.
         APT_OPTS: >-
-          -o Acquire::Retries=3
-          -o Acquire::http::Timeout=20
-          -o Acquire::https::Timeout=20
+          -o Acquire::Retries=2
+          -o Acquire::http::Timeout=15
+          -o Acquire::https::Timeout=15
           -o Acquire::http::Pipeline-Depth=0
+          -o DPkg::Lock::Timeout=300
       run: |
-        # The cache restores root-owned files; the cache action runs unprivileged.
+        set -euo pipefail
+        # Timestamped phase markers: a stall is then attributable from the log.
+        phase() { echo "::group::$* at $(date -u +%H:%M:%S)"; }
+
+        phase "wait for cloud-init"
+        # cloud-init's package writes are what hold the lock at boot. This is a
+        # no-op once it has finished, and it is cheap.
+        sudo cloud-init status --wait >/dev/null 2>&1 || true
+
+        phase "apt-get update"
+        sudo timeout 420 apt-get $APT_OPTS update
+
+        phase "apt-get install"
+        # The archive cache is restored as root; the cache action runs unprivileged.
         sudo chmod -R a+rX /var/cache/apt/archives 2>/dev/null || true
-        sudo apt-get $APT_OPTS update
-        sudo apt-get $APT_OPTS install -y --no-install-recommends \
+        sudo timeout 900 apt-get $APT_OPTS install -y --no-install-recommends \
           libwebkit2gtk-4.1-dev \
           libayatana-appindicator3-dev \
           librsvg2-dev \
@@ -52,3 +70,7 @@ runs:
           curl \
           wget \
           file
+
+        phase "verify"
+        pkg-config --exists webkit2gtk-4.1 && echo "webkit2gtk-4.1 present"
+        echo "::endgroup::"
