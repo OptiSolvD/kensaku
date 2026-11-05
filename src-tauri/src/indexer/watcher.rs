@@ -232,7 +232,6 @@ fn run_watcher(
         }
     }
     watcher_ok.store(registered > 0, Ordering::SeqCst);
-    }
 
     let mut pending = PendingUpserts::default();
     let mut pending_commits = 0;
