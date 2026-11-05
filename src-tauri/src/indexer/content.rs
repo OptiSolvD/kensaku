@@ -2264,7 +2264,7 @@ mod tests {
             Some("K12 filter pushdown migration (schema v2 -> v3)")
         );
         let marker = fs::read_to_string(index_dir.join(SCHEMA_MARKER_FILE)).unwrap();
-        assert_eq!(marker.trim(), "3");
+        assert_eq!(marker.trim(), CONTENT_SCHEMA_VERSION.to_string());
         assert!(migrated.ext_field.is_some());
         assert!(migrated.size_field.is_some());
         drop(migrated);
@@ -2314,7 +2314,7 @@ mod tests {
         );
         assert!(index_dir.join(SCHEMA_MARKER_FILE).exists());
         let marker = fs::read_to_string(index_dir.join(SCHEMA_MARKER_FILE)).unwrap();
-        assert_eq!(marker.trim(), "3");
+        assert_eq!(marker.trim(), CONTENT_SCHEMA_VERSION.to_string());
         drop(migrated);
         std::thread::sleep(std::time::Duration::from_millis(20));
 
