@@ -160,6 +160,18 @@ jobs:
           $version = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
           New-Item -ItemType Directory -Force -Path "dist\portable" | Out-Null
           Copy-Item "src-tauri\target\release\kensaku.exe" "dist\portable\kensaku.exe"
+
+          # ONNX Runtime must sit next to the exe. The bundled installers get it
+          # as a Tauri resource, but this zip is hand-assembled and previously
+          # shipped without it: Indra and PP-OCR could never load on a portable
+          # install, on every machine, permanently. Fail the build rather than
+          # publish an artifact with dead OCR.
+          $ort = "src-tauri\target\release\onnxruntime.dll"
+          if (-not (Test-Path $ort)) { $ort = "src-tauri\onnxruntime.dll" }
+          if (-not (Test-Path $ort)) { throw "onnxruntime.dll not staged; portable zip would ship without OCR" }
+          Copy-Item $ort "dist\portable\onnxruntime.dll"
+          if (-not (Test-Path "dist\portable\onnxruntime.dll")) { throw "onnxruntime.dll was not copied into the portable folder" }
+
           Set-Content -Path "dist\portable\portable" -Value "" -NoNewline -Encoding ascii
           @'
           Kensaku portable
@@ -171,6 +183,10 @@ jobs:
 
           The folder must be writable. Requires the system WebView2
           runtime, preinstalled on Windows 10 1803+ and Windows 11.
+
+          Keep onnxruntime.dll next to kensaku.exe: the OCR engines need it.
+          If it is removed, text search still works but image and scanned-PDF
+          search is disabled.
           '@ | Set-Content -Path "dist\portable\README.txt"
           Compress-Archive -Path "dist\portable\*" -DestinationPath "dist\kensaku-portable-$version-${{ matrix.arch }}.zip" -Force
           Remove-Item -Recurse -Force "dist\portable"
