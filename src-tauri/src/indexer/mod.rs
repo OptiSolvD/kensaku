@@ -1286,6 +1286,10 @@ impl IndexerManager {
                     retried: retry_paths.len().saturating_sub(given_up),
                     abandoned: given_up,
                     reason,
+                    // Recorded after the crawl, so this is what the next
+                    // launch will compare against.
+                    ocr_signature_stored: read_ocr_signature(),
+                    ocr_signature_now: crate::ocr::signature(),
                 });
             }
 
@@ -1826,6 +1830,11 @@ impl IndexerManager {
         if stored.as_deref() == Some(signature.as_str()) {
             return false;
         }
+        crate::say_err!(
+            "[Kensaku OCR] state changed: was {:?}, now {:?}",
+            stored.as_deref().unwrap_or("<none recorded>"),
+            signature
+        );
         if crate::ocr::usable_engine() == crate::ocr::NONE {
             crate::say_err!(
                 "[Kensaku OCR] no OCR engine can run right now; keeping the recorded state so a \
@@ -1983,6 +1992,12 @@ pub struct CrawlReport {
     pub abandoned: usize,
     /// Why anything was reindexed. "nothing changed" when nothing was.
     pub reason: String,
+    /// OCR state as recorded, and as computed by this launch. Equal values mean
+    /// no image should have been re-read for OCR.
+    #[serde(default)]
+    pub ocr_signature_stored: Option<String>,
+    #[serde(default)]
+    pub ocr_signature_now: String,
 }
 
 fn crawl_report_path() -> std::path::PathBuf {

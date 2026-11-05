@@ -414,6 +414,19 @@ fn check_last_crawl() -> DoctorCheck {
             report.abandoned
         ));
     }
+    // When the OCR state differs from the recorded one, every image and
+    // scanned PDF is re-read. Saying so turns a mysterious multi-minute scan
+    // into a named cause.
+    if report.ocr_signature_stored.as_deref() != Some(report.ocr_signature_now.as_str()) {
+        detail.push_str(&format!(
+            " · OCR state {} -> {}",
+            report
+                .ocr_signature_stored
+                .as_deref()
+                .unwrap_or("<none recorded>"),
+            report.ocr_signature_now
+        ));
+    }
 
     // A launch that re-reads a large share of the corpus without a schema
     // rebuild or an OCR change is the pattern worth flagging.
