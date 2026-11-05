@@ -1377,6 +1377,7 @@ function ResetDialog({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation("settings");
   const [text, setText] = useState("");
   const [running, setRunning] = useState(false);
+  const [removePacks, setRemovePacks] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dialogRef = React.useRef<HTMLDivElement>(null);
   const matches = text === CONFIRM_WORD;
@@ -1422,7 +1423,7 @@ function ResetDialog({ onClose }: { onClose: () => void }) {
     setRunning(true);
     setError(null);
     try {
-      await invoke("reset_all", { confirm: CONFIRM_WORD });
+      await invoke("reset_all", { confirm: CONFIRM_WORD, removePacks });
       // Resolves → the app restarts. Clear client-only view state so a
       // relaunched window comes up fresh; show nothing.
       clearClientState();
@@ -1474,6 +1475,25 @@ function ResetDialog({ onClose }: { onClose: () => void }) {
           </div>
 
           <div className="px-4 pb-4">
+            {/* Downloaded OCR and model packs survive a reset by default: they
+                are ~55 MB of downloads, not the user's own data, and removing
+                them means waiting for them again before search works. */}
+            <label className="mb-3 flex cursor-pointer items-start gap-2 rounded-control border border-line p-2.5">
+              <input
+                type="checkbox"
+                checked={removePacks}
+                onChange={(e) => setRemovePacks(e.target.checked)}
+                className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-[var(--danger)]"
+              />
+              <span className="min-w-0">
+                <span className="block text-[12px] font-medium text-fg">
+                  {t("about.resetDialog.packsTitle")}
+                </span>
+                <span className="block text-[11px] leading-[16px] text-muted">
+                  {t("about.resetDialog.packsBody")}
+                </span>
+              </span>
+            </label>
             <label htmlFor="reset-confirm" className="eyebrow pb-1.5 block">
               {t("about.resetDialog.typeReset")} <span className="font-mono normal-case text-danger">RESET</span> {t("about.resetDialog.toConfirm")}
             </label>

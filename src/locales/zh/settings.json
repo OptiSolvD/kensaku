@@ -249,7 +249,9 @@
       "toConfirm": "以确认",
       "cancelButton": "取消",
       "resetting": "正在重置…",
-      "resetAndRestart": "重置并重启"
+      "resetAndRestart": "重置并重启",
+      "packsTitle": "同时删除已下载的 OCR 和模型包",
+      "packsBody": "默认不勾选。保留它们可以在重置后立即使用搜索，无需重新下载。"
     },
     "reportIssue": "反馈问题",
     "autoUpdateSetting": "自动检查更新",

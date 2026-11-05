@@ -266,3 +266,39 @@ the path where you saved the file).
 - **Hyprland:** add `bind = SUPER, space, exec, kensaku --toggle` to `~/.config/hypr/hyprland.conf`.
 
 Pick a key that no other app uses. Kensaku doesn't change or reserve any keys.
+
+## Uninstalling
+
+Kensaku keeps everything in one data folder, so an uninstall is two steps:
+remove the program, then remove the data. The second step is separate on
+purpose, because it holds your settings and index and it is not something an
+installer should delete without being asked.
+
+| Platform | Remove the program | Remove the data |
+|---|---|---|
+| Windows | Settings → Apps → Kensaku → Uninstall | Removed by the uninstaller |
+| macOS | Drag Kensaku out of Applications | `kensaku --remove-data` |
+| Linux (deb/rpm) | `sudo apt remove kensaku` / `sudo rpm -e kensaku` | `kensaku --remove-data` |
+| Linux (AppImage) | Delete the AppImage file | `kensaku --remove-data` |
+
+If `kensaku` is not on your PATH, run the same flag against the binary you
+launched, for example `./kensaku.AppImage --remove-data`.
+
+`--remove-data` prints how much it freed. Quit Kensaku first: it deletes all
+data, so it will not run while the files are open.
+
+On Windows the uninstaller also clears `%LOCALAPPDATA%\com.gochi.kensaku` (webview
+data) and `%TEMP%\kensaku-updates` (staged installers from the in-app
+updater). A **portable** install keeps its data in a `data` folder beside the
+executable. Delete that folder yourself; the uninstaller leaves it alone
+because it is inside a folder you chose.
+
+Nothing writes outside the data folder, the two locations above, and the
+autostart entry. There is no telemetry, no cloud storage and no registry state
+beyond that entry.
+
+### Reset instead of uninstalling
+
+Settings → About → Reset all clears your settings, index and cached data and
+keeps the app installed. Downloaded OCR and model packs are kept by default, so
+search works again immediately; tick the box in the dialog to remove them too.

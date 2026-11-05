@@ -94,7 +94,7 @@ fn dir_is_empty(dir: &Path) -> bool {
     }
 }
 
-fn format_bytes(bytes: u64) -> String {
+pub(crate) fn format_bytes(bytes: u64) -> String {
     const KIB: f64 = 1024.0;
     const MIB: f64 = KIB * 1024.0;
     const GIB: f64 = MIB * 1024.0;
@@ -352,8 +352,44 @@ fn check_full_text_index(nodes: usize) -> DoctorCheck {
     ok(ID, LABEL, detail)
 }
 
+/// What the data folder holds, and whether past upgrades left anything behind.
+fn check_storage() -> DoctorCheck {
+    let info = crate::maintenance::inventory();
+    let mut parts = vec![format!("data folder {}", format_bytes(info.total_bytes))];
+    if info.index_bytes > 0 {
+        parts.push(format!("index {}", format_bytes(info.index_bytes)));
+    }
+    if info.pack_bytes > 0 {
+        parts.push(format!("downloaded packs {}", format_bytes(info.pack_bytes)));
+    }
+    if info.legacy_backups > 0 {
+        parts.push(format!(
+            "{} superseded index backup(s), {}",
+            info.legacy_backups,
+            format_bytes(info.legacy_backup_bytes)
+        ));
+    }
+    if info.update_temp_bytes > 0 {
+        parts.push(format!("staged updates {}", format_bytes(info.update_temp_bytes)));
+    }
+    let detail = parts.join(" · ");
+
+    // Old schema backups and staged installers are pure accumulation. They are
+    // pruned at startup, but say so rather than leaving a user to wonder why
+    // their profile keeps growing.
+    if info.legacy_backups > 1 || info.update_temp_bytes > 0 {
+        return warn(
+            "storage",
+            "Data folder",
+            detail,
+            Some("Cleaned up automatically on the next launch.".to_string()),
+        );
+    }
+    ok("storage", "Data folder", detail)
+}
+
 /// What the last crawl did, so "it indexes every time I open it" can be
-/// answered from the Health tab rather than from stderr a release build never
+/// answered from the Health tab rather than from output a release build never
 /// shows anyone.
 fn check_last_crawl() -> DoctorCheck {
     let Some(report) = crate::indexer::last_crawl_report() else {
@@ -852,6 +888,7 @@ pub fn run(state: &AppState) -> DoctorReport {
 
     let mut checks = vec![
         check_config_dir_writable(),
+        check_storage(),
         check_disk_space(&config_dir),
         check_crash_log(),
         check_metadata_db(&config_dir),

@@ -27,13 +27,22 @@
 !macro NSIS_HOOK_POSTUNINSTALL
   DetailPrint "Removing Kensaku data..."
   ; Runtime data: config, index, metadata.db, thumbs, tessdata, ocr packs,
-  ; model packs, agent HTTP token.
+  ; model packs, agent HTTP token, logs, crawl report.
   RMDir /r "$APPDATA\kensaku"
+  ; A portable install keeps its data beside the exe. That folder is the
+  ; user's own, so uninstalling the installed copy must not touch it.
   ; Tauri identifier-scoped directories, used for the WebView2 profile and any
   ; $APPCONFIG-pathed artifacts. Removed whichever of them exist.
   RMDir /r "$APPDATA\com.gochi.kensaku"
   RMDir /r "$LOCALAPPDATA\com.gochi.kensaku"
-  ; Autostart entry written by the auto-launch crate.
+  RMDir /r "$LOCALAPPDATA\kensaku"
+  ; Installers and partial downloads staged by the in-app updater. These live
+  ; in the temp directory and are not covered by anything above: a few upgrades
+  ; leave hundreds of megabytes here.
+  RMDir /r "$TEMP\kensaku-updates"
+  ; Autostart entry written by the auto-launch crate, under both names it has
+  ; used so an older install is cleaned up too.
   DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "Kensaku"
+  DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "kensaku"
   DetailPrint "Kensaku data removed."
 !macroend

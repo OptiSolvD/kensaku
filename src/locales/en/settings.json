@@ -249,7 +249,9 @@
       "toConfirm": "to confirm",
       "cancelButton": "Cancel",
       "resetting": "Resetting…",
-      "resetAndRestart": "Reset and restart"
+      "resetAndRestart": "Reset and restart",
+      "packsTitle": "Also delete downloaded OCR and model packs",
+      "packsBody": "Off by default. Keeping them means search works immediately after the reset instead of waiting for a re-download."
     },
     "reportIssue": "Report an issue",
     "autoUpdateSetting": "Check for updates automatically",

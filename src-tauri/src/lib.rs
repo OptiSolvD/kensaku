@@ -9,6 +9,7 @@ pub mod embed;
 pub mod indexer;
 pub mod models;
 pub mod main_window;
+pub mod maintenance;
 pub mod ocr;
 pub mod ocr_indra;
 pub mod preview;
@@ -154,7 +155,15 @@ fn apply_pending_reset_in(dir: &std::path::Path) -> bool {
         return false;
     }
 
-    match std::fs::remove_dir_all(dir) {
+    // Downloaded OCR and model packs survive a reset unless the user asked
+    // for them explicitly (see `ResetScope`). Wiping the whole directory used
+    // to throw away ~55 MB of downloads that are not the user's data, so
+    // "reset to fix a bad index" cost a re-download before search worked.
+    let scope = maintenance::ResetScope {
+        remove_packs: reset_marker_removes_packs(dir),
+    };
+
+    match maintenance::apply_reset(dir, scope) {
         Ok(()) => {
             if let Err(e) = std::fs::create_dir_all(dir) {
                 eprintln!(
@@ -169,18 +178,35 @@ fn apply_pending_reset_in(dir: &std::path::Path) -> bool {
                 use std::os::unix::fs::PermissionsExt;
                 let _ = std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700));
             }
+            let _ = std::fs::remove_file(&marker);
             eprintln!(
-                "[Kensaku] Reset requested: cleared all data in {}",
-                dir.display()
+                "[Kensaku] Reset requested: cleared user data in {}{}",
+                dir.display(),
+                if scope.remove_packs {
+                    " (including downloaded packs)"
+                } else {
+                    " (downloaded packs kept)"
+                }
             );
         }
         Err(e) => eprintln!(
-            "[Kensaku] Reset requested but could not clear {}: {}",
+            "[Kensaku] Reset requested but could not clear everything in {}: {}",
             dir.display(),
             e
         ),
     }
     true
+}
+
+/// True when the reset marker asks for the downloaded packs to go as well.
+///
+/// The marker's contents carry the choice, so the decision is made by the UI
+/// that asked for the reset and applied by the fresh process before anything
+/// is open.
+fn reset_marker_removes_packs(dir: &std::path::Path) -> bool {
+    std::fs::read_to_string(reset_marker_path_in(dir))
+        .map(|contents| contents.trim().eq_ignore_ascii_case("full"))
+        .unwrap_or(false)
 }
 
 /// Clears Kensaku state when a reset was requested by `reset_all`.
@@ -238,10 +264,50 @@ pub fn run() {
         std::env::consts::ARCH
     ));
 
+    // `--remove-data` deletes everything Kensaku stores and exits, without
+    // opening the window or the stores. This is what an uninstall does on
+    // platforms where the installer has no uninstall hook (Linux, macOS), and
+    // what a user can run by hand. Windows still gets the NSIS hook.
+    if std::env::args().any(|arg| arg == "--remove-data") {
+        match maintenance::remove_all_data() {
+            Ok(report) => {
+                crate::say!(
+                    "Removed Kensaku data from {} ({} reclaimed).",
+                    report.path,
+                    report.human_bytes()
+                );
+            }
+            Err(error) => {
+                crate::say_err!("Could not remove Kensaku data: {error}");
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
+
     commands::init_process_start();
 
     maybe_apply_pending_rebuild();
     maybe_apply_pending_reset();
+
+    // Reclaim what past upgrades left behind. Best-effort: a failure here must
+    // never stop startup.
+    let cleaned = maintenance::cleanup_stale_artifacts();
+    if cleaned.bytes_reclaimed > 0 || !cleaned.errors.is_empty() {
+        crate::say!(
+            "[Kensaku] cleanup: removed {} legacy index backup(s), reclaimed {} bytes{}",
+            cleaned.legacy_backups_removed,
+            cleaned.bytes_reclaimed,
+            if cleaned.update_temp_cleared {
+                ", cleared staged updates"
+            } else {
+                ""
+            }
+        );
+        for error in &cleaned.errors {
+            crate::say_err!("[Kensaku] cleanup: {error}");
+        }
+    }
 
     #[cfg(unix)]
     let daemon_available = crate::daemon::DaemonClient::ensure();
@@ -540,6 +606,36 @@ mod reset_tests {
 
         // A second call without a marker is a no-op.
         assert!(!apply_pending_reset_in(&dir));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn reset_keeps_downloaded_packs_unless_asked_for_a_full_reset() {
+        let dir = std::env::temp_dir().join(format!(
+            "kensaku-reset-packs-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(dir.join("models")).unwrap();
+        std::fs::write(dir.join("models/embed.onnx"), b"pack").unwrap();
+        std::fs::create_dir_all(dir.join("index")).unwrap();
+        std::fs::write(dir.join("metadata.db"), b"stale").unwrap();
+
+        // Default reset: index and database go, downloaded packs stay.
+        std::fs::write(reset_marker_path_in(&dir), b"keep-packs").unwrap();
+        assert!(apply_pending_reset_in(&dir));
+        assert!(dir.join("models/embed.onnx").exists());
+        assert!(!dir.join("metadata.db").exists());
+        assert!(!dir.join("index").exists());
+
+        // Explicit full reset: packs go too.
+        std::fs::write(reset_marker_path_in(&dir), b"full").unwrap();
+        assert!(apply_pending_reset_in(&dir));
+        assert!(!dir.join("models").exists());
+
         let _ = std::fs::remove_dir_all(&dir);
     }
 

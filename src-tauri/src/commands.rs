@@ -1330,7 +1330,11 @@ pub fn last_query() -> String {
 /// the removal ordering safe: no open handles exist when the directory is
 /// deleted.
 #[tauri::command]
-pub async fn reset_all(app: AppHandle, confirm: String) -> Result<(), String> {
+pub async fn reset_all(
+    app: AppHandle,
+    confirm: String,
+    remove_packs: Option<bool>,
+) -> Result<(), String> {
     if confirm != "RESET" {
         return Err("Reset cancelled: confirmation must be exactly \"RESET\".".to_string());
     }
@@ -1339,7 +1343,11 @@ pub async fn reset_all(app: AppHandle, confirm: String) -> Result<(), String> {
     std::fs::create_dir_all(&dir)
         .map_err(|e| format!("Failed to create config directory: {}", e))?;
     let marker = dir.join(".reset-requested");
-    std::fs::write(&marker, b"1").map_err(|e| format!("Failed to write reset marker: {}", e))?;
+    // The marker's contents carry the choice: the fresh process applies it
+    // before anything is open, and keeps downloaded packs unless told "full".
+    let scope = if remove_packs.unwrap_or(false) { "full" } else { "keep-packs" };
+    std::fs::write(&marker, scope.as_bytes())
+        .map_err(|e| format!("Failed to write reset marker: {}", e))?;
 
     // The replacement process starts before this one exits, so the instance
     // lock has to be handed over first. Without this the fresh instance lost
