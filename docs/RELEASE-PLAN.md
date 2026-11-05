@@ -283,6 +283,12 @@ row while holding the write lock. Fix: prefix `UPDATE`, filtered cursor.
 
 ---
 
+## 10. Manual testing
+
+Defects CI cannot reach (window-manager behaviour, IME input, filesystem permissions, the
+updater and the reset flow) are listed in [`TESTING-1.0.16.md`](TESTING-1.0.16.md). Each item
+states the old behaviour, so a pass means "this no longer happens".
+
 ## 11. Branches opened from this review
 
 | Branch | What it fixes |
