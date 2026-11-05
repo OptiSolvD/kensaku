@@ -127,41 +127,54 @@ fn max_ocr_pages() -> usize {
 fn extract_scanned_pdf_ocr(doc: &Document, max_bytes: usize) -> (Option<String>, bool) {
     use crate::ocr::OcrOutcome;
 
+    // One page in memory at a time. Decoding the whole document first meant a
+    // 20-page scan held ~3 GB before OCR started, which is where large scans
+    // fell over.
     let mut skipped: Vec<String> = Vec::new();
-    let images = crate::indexer::extract::pdf_image::page_images(doc, max_ocr_pages(), |reason| {
-        if skipped.len() < 3 {
-            skipped.push(reason);
-        }
-    });
-    if images.is_empty() && !skipped.is_empty() {
+    let mut collected = String::new();
+    let mut unavailable = false;
+    let mut decoded_pages = 0usize;
+
+    crate::indexer::extract::pdf_image::for_each_page_image(
+        doc,
+        max_ocr_pages(),
+        |reason| {
+            if skipped.len() < 3 {
+                skipped.push(reason);
+            }
+        },
+        |image| {
+            decoded_pages += 1;
+            if collected.len() >= max_bytes || unavailable {
+                // Stop decoding further pages: the text budget is spent or
+                // the engine cannot run, and a retry happens either way.
+                return false;
+            }
+            match crate::indexer::extract::image::ocr_decoded_image(&image) {
+                OcrOutcome::Text(text) => {
+                    let trimmed = text.trim();
+                    if !trimmed.is_empty() {
+                        if !collected.is_empty() {
+                            collected.push_str("\n\n");
+                        }
+                        collected.push_str(trimmed);
+                    }
+                }
+                OcrOutcome::NoText => {}
+                OcrOutcome::Unavailable => {
+                    unavailable = true;
+                    return false;
+                }
+            }
+            true
+        },
+    );
+
+    if decoded_pages == 0 && !skipped.is_empty() {
         eprintln!(
             "[Kensaku PDF] scanned PDF has no image Kensaku can decode: {}",
             skipped.join("; ")
         );
-    }
-
-    let mut collected = String::new();
-    let mut unavailable = false;
-    for image in &images {
-        if collected.len() >= max_bytes {
-            break;
-        }
-        match crate::indexer::extract::image::ocr_decoded_image(image) {
-            OcrOutcome::Text(text) => {
-                let trimmed = text.trim();
-                if !trimmed.is_empty() {
-                    if !collected.is_empty() {
-                        collected.push_str("\n\n");
-                    }
-                    collected.push_str(trimmed);
-                }
-            }
-            OcrOutcome::NoText => {}
-            OcrOutcome::Unavailable => {
-                unavailable = true;
-                break;
-            }
-        }
     }
 
     let text = (!collected.trim().is_empty()).then_some(collected);

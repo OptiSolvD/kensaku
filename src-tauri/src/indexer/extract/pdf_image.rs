@@ -24,25 +24,32 @@ pub const MAX_PDF_IMAGE_PIXELS: u64 = 50_000_000;
 /// scanned pages. Skipping them saves OCR time and noise.
 pub const MIN_PDF_IMAGE_SIDE: u32 = 64;
 
-/// Every embedded raster image of every page, in page order, decoded.
+/// Streams the embedded raster images of every page, in page order.
+///
+/// `on_image` receives each page as soon as it is decoded and returns whether
+/// to keep going. Collecting them first (the old `page_images`) decoded every
+/// page into memory before any OCR ran: twenty 50 MP pages is about 3 GB
+/// resident, which is a machine-dependent crash on exactly the documents OCR
+/// exists for. Decoding one page at a time caps peak memory at one page.
 ///
 /// Images are deduplicated by object id (a logo repeated on every page is
 /// decoded once) and capped at `max_images`. Undecodable images are reported
 /// through `on_skip` with a reason instead of being dropped silently.
-pub fn page_images(
+pub fn for_each_page_image(
     doc: &Document,
     max_images: usize,
     mut on_skip: impl FnMut(String),
-) -> Vec<DynamicImage> {
+    mut on_image: impl FnMut(DynamicImage) -> bool,
+) {
     let mut seen = std::collections::HashSet::new();
-    let mut out = Vec::new();
+    let mut emitted = 0usize;
     for (page_no, page_id) in doc.get_pages() {
         let Ok(images) = doc.get_page_images(page_id) else {
             continue;
         };
         for pdf_image in images {
-            if out.len() >= max_images {
-                return out;
+            if emitted >= max_images {
+                return;
             }
             if !seen.insert(pdf_image.id) {
                 continue;
@@ -51,11 +58,31 @@ pub fn page_images(
                 continue;
             };
             match decode_image_stream(doc, stream) {
-                Ok(img) => out.push(img),
+                Ok(image) => {
+                    emitted += 1;
+                    // Dropped by the caller before the next decode.
+                    if !on_image(image) {
+                        return;
+                    }
+                }
                 Err(reason) => on_skip(format!("page {page_no}: {reason}")),
             }
         }
     }
+}
+
+/// Collected form of [`for_each_page_image`], for tests and callers that do
+/// want every page at once.
+pub fn page_images(
+    doc: &Document,
+    max_images: usize,
+    mut on_skip: impl FnMut(String),
+) -> Vec<DynamicImage> {
+    let mut out = Vec::new();
+    for_each_page_image(doc, max_images, &mut on_skip, |image| {
+        out.push(image);
+        true
+    });
     out
 }
 
