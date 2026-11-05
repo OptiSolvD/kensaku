@@ -151,8 +151,6 @@ pub fn get_status() -> UpdateStatus {
 /// attempt was refused as "busy" until the process restarted.
 const METADATA_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 const DOWNLOAD_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(600);
-/// Read timeout for a single socket read during the asset download.
-const DOWNLOAD_READ_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
 
 /// Browser URL of the release's `SHA256SUMS` asset, captured during the
 /// metadata check. `None` when the release does not publish one.
@@ -266,7 +264,13 @@ fn sha256_of(path: &std::path::Path) -> Result<String, String> {
         }
         hasher.update(&buf[..read]);
     }
-    Ok(format!("{:x}", hasher.finalize()))
+    let digest = hasher.finalize();
+    let mut hex = String::with_capacity(digest.len() * 2);
+    for &byte in digest.as_slice() {
+        use std::fmt::Write as _;
+        let _ = write!(hex, "{:02x}", byte);
+    }
+    Ok(hex)
 }
 
 /// Initiates download of the chosen asset in a background worker thread.
@@ -321,7 +325,6 @@ pub fn download_update(asset_url: &str, asset_name: &str) -> Result<UpdateStatus
                 let resp = ureq::get(&url)
                     .set("User-Agent", &format!("kensaku-updater/{}", env!("CARGO_PKG_VERSION")))
                     .timeout(DOWNLOAD_TIMEOUT)
-                    .timeout_read(DOWNLOAD_READ_TIMEOUT)
                     .call()
                     .map_err(|e| format!("Download request failed: {e}"))?;
 
