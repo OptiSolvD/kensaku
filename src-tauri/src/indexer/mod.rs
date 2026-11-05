@@ -78,6 +78,15 @@ fn now_unix_secs() -> u64 {
 /// A pending entry (set by an OCR toggle) is always re-processed even when its
 /// mtime and size still match, which is how the image re-scan stays targeted.
 fn is_unchanged(existing: &FileEntry, entry: &FileEntry) -> bool {
+    // (0, 0) is the walker's "I could not stat this" sentinel, not a file
+    // state: a Windows file locked by another process, or one being scanned by
+    // antivirus, fails `metadata()` for that moment. Treating it as a change
+    // did two harmful things — it re-read the file, and it *stored* 0/0 as the
+    // file's size and modification time, so the next scan saw different values
+    // and re-read it again. One transient lock produced churn across launches.
+    if entry.size == 0 && entry.modified == 0 {
+        return true;
+    }
     existing.modified == entry.modified && existing.size == entry.size && !existing.content_pending
 }
 
@@ -1798,18 +1807,33 @@ impl IndexerManager {
             }
         }
 
+        // Never downgrade a stored signature to "no engine".
+        //
+        // The engine probe runs once per process and its failure is cached,
+        // and at startup it can fail for reasons that have nothing to do with
+        // this machine: the ONNX runtime library being scanned by antivirus,
+        // or a self-test losing a race with the engine pool loading. Writing
+        // "none" in that state meant the *next* launch saw a different
+        // signature and queued every image and scanned PDF for re-reading —
+        // a whole-corpus OCR pass triggered by a transient failure.
+        //
+        // Leaving the stored signature alone when nothing can read images
+        // keeps the "engine became usable, re-read the images" path intact
+        // for a first run (where nothing is stored yet) without letting a
+        // temporary failure re-read anything.
         let signature = crate::ocr::signature();
-        if read_ocr_signature().as_deref() == Some(signature.as_str()) {
+        let stored = read_ocr_signature();
+        if stored.as_deref() == Some(signature.as_str()) {
+            return false;
+        }
+        if crate::ocr::usable_engine() == crate::ocr::NONE {
+            crate::say_err!(
+                "[Kensaku OCR] no OCR engine can run right now; keeping the recorded state so a \
+                 temporary failure does not re-read every image"
+            );
             return false;
         }
         write_ocr_signature(&signature);
-        if crate::ocr::usable_engine() == crate::ocr::NONE {
-            // Nothing can read images yet. Remembered, so the moment an
-            // engine becomes usable the signature differs and everything is
-            // re-read.
-            crate::say_err!("[Kensaku OCR] no OCR engine can run yet");
-            return false;
-        }
         crate::indexer::extract::clear_cache();
         let marked = metadata.write().mark_ocr_targets_pending();
         crate::say_err!(
@@ -2106,6 +2130,22 @@ mod tests {
             !is_unchanged(&pending, &entry(100, 10, false)),
             "a pending entry must be re-processed even when mtime/size match"
         );
+    }
+
+    #[test]
+    fn an_unstatable_file_is_not_treated_as_changed() {
+        // The walker records (0, 0) when metadata() fails: a file locked by
+        // another process, or one antivirus is scanning. That is a failure to
+        // read the file, not a file with no content that was modified in 1970.
+        let existing = entry(100, 10, false);
+        assert!(
+            is_unchanged(&existing, &entry(0, 0, false)),
+            "an unreadable stat must not force a re-read"
+        );
+
+        // A genuinely emptied file keeps its modification time, so it is still
+        // detected: size changed, time did not.
+        assert!(!is_unchanged(&existing, &entry(100, 0, false)));
     }
 
     #[test]
