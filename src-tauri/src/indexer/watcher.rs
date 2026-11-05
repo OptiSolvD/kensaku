@@ -202,7 +202,7 @@ fn run_watcher(
     let mut watcher = match RecommendedWatcher::new(tx, Config::default()) {
         Ok(w) => w,
         Err(e) => {
-            eprintln!("[Kensaku Watcher] Failed to initialize watcher: {}", e);
+            crate::say_err!("[Kensaku Watcher] Failed to initialize watcher: {}", e);
             watcher_ok.store(false, Ordering::SeqCst);
             return;
         }
@@ -220,10 +220,10 @@ fn run_watcher(
         match watcher.watch(root, RecursiveMode::Recursive) {
             Ok(()) => {
                 registered += 1;
-                println!("[Kensaku Watcher] Watching {}", root.display());
+                crate::say!("[Kensaku Watcher] Watching {}", root.display());
             }
             Err(error) => {
-                eprintln!(
+                crate::say_err!(
                     "[Kensaku Watcher] Failed to watch {}: {}",
                     root.display(),
                     error
@@ -293,7 +293,7 @@ fn run_watcher(
                     }
                 }
                 Ok(Err(e)) => {
-                    eprintln!("[Kensaku Watcher] Error event: {:?}", e);
+                    crate::say_err!("[Kensaku Watcher] Error event: {:?}", e);
                 }
                 Err(std::sync::mpsc::TryRecvError::Empty) => {
                     // No more events; fall through to commit check
@@ -338,7 +338,7 @@ fn run_watcher(
                     );
                 }
                 Ok(Err(e)) => {
-                    eprintln!("[Kensaku Watcher] Error event: {:?}", e);
+                    crate::say_err!("[Kensaku Watcher] Error event: {:?}", e);
                 }
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
                 Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
@@ -417,7 +417,7 @@ fn spawn_rescan(
     thread::spawn(move || {
         let changed = rescan_watched_dirs(&dirs, &cfg, &metadata, &content_index);
         if changed > 0 {
-            eprintln!("[Kensaku Watcher] Rescan reconciled {} paths", changed);
+            crate::say_err!("[Kensaku Watcher] Rescan reconciled {} paths", changed);
         }
         running.store(false, Ordering::SeqCst);
     });

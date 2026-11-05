@@ -84,7 +84,7 @@ pub fn apply_mode(window: &WebviewWindow, app_mode: &str) {
 /// without a console. The log path is included so a bug report is actionable.
 fn report_creation_failure(app: &AppHandle, error: &str) {
     crate::crashlog::record_error("main window creation", error);
-    eprintln!("[Kensaku] could not create the window: {error}");
+    crate::say_err!("[Kensaku] could not create the window: {error}");
 
     use tauri_plugin_dialog::DialogExt;
     let hint = if cfg!(windows) {

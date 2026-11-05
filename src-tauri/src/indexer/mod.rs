@@ -293,7 +293,7 @@ impl IndexerManager {
         let content_index = match ContentIndex::new(&index_dir) {
             Ok(idx) => Some(idx),
             Err(e) => {
-                eprintln!("[Kensaku] Failed to create Tantivy index: {}", e);
+                crate::say_err!("[Kensaku] Failed to create Tantivy index: {}", e);
                 None
             }
         };
@@ -329,13 +329,13 @@ impl IndexerManager {
                             );
                         }
                         Err(e) => {
-                            eprintln!("[Kensaku] Failed to reset semantic index: {}", e);
+                            crate::say_err!("[Kensaku] Failed to reset semantic index: {}", e);
                         }
                     }
                 }
                 Ok(_) => {}
                 Err(e) => {
-                    eprintln!("[Kensaku] Failed to read semantic model id: {}", e);
+                    crate::say_err!("[Kensaku] Failed to read semantic model id: {}", e);
                 }
             }
         }
@@ -350,14 +350,14 @@ impl IndexerManager {
                 Ok(count) => {
                     units_count = count;
                     if units_count > 0 {
-                        println!(
+                        crate::say!(
                             "[Kensaku] Loaded {} semantic units from database",
                             units_count
                         );
                     }
                 }
                 Err(e) => {
-                    eprintln!("[Kensaku] Failed to load semantic units: {}", e);
+                    crate::say_err!("[Kensaku] Failed to load semantic units: {}", e);
                 }
             }
             let mut vstore = visual_store.write();
@@ -366,7 +366,7 @@ impl IndexerManager {
 
         if content_rebuilt {
             let marked = metadata_store.write().mark_all_content_pending();
-            eprintln!(
+            crate::say_err!(
                 "[Kensaku] Content index schema upgraded; {} file(s) queued for re-indexing",
                 marked
             );
@@ -664,13 +664,19 @@ impl IndexerManager {
                 queue.stop();
             }
 
-            println!(
+            crate::say!(
                 "[Kensaku Indexer] Starting directory scan across {:?}",
                 watched_dirs
             );
 
             let mut files_count: usize = 0;
             let mut content_count = 0;
+            // Why files were re-read, counted rather than guessed. A launch
+            // that re-reads thousands of unchanged files is only diagnosable
+            // if the crawl can say which bucket they fell into.
+            let mut new_files = 0usize;
+            let mut restamped_files = 0usize;
+            let mut pending_files = 0usize;
             let mut pending_commits = 0;
             let mut crawled_paths: HashSet<PathBuf> = HashSet::new();
             // Images flagged by an OCR-toggle re-scan that were processed by
@@ -729,6 +735,18 @@ impl IndexerManager {
                 let was_pending = previous
                     .as_ref()
                     .is_some_and(|existing| existing.content_pending);
+                match previous.as_ref() {
+                    None => new_files += 1,
+                    Some(existing) => {
+                        if was_pending {
+                            pending_files += 1;
+                        } else if existing.modified != entry.modified
+                            || existing.size != entry.size
+                        {
+                            restamped_files += 1;
+                        }
+                    }
+                }
                 let phash_needs_refresh = previous.as_ref().is_none_or(|existing| {
                     existing.modified != entry.modified || existing.size != entry.size
                 });
@@ -1103,7 +1121,7 @@ impl IndexerManager {
                 }
             }
             if !retry_paths.is_empty() {
-                println!(
+                crate::say!(
                     "[Kensaku Indexer] {} file(s) left pending for retry (timeout or busy){}",
                     retry_paths.len() - given_up,
                     if given_up > 0 {
@@ -1140,7 +1158,7 @@ impl IndexerManager {
                     "{} roots unavailable, index preserved",
                     unavailable_roots.len()
                 );
-                println!("[Kensaku Indexer] {}: {:?}", hint, unavailable_roots);
+                crate::say!("[Kensaku Indexer] {}: {:?}", hint, unavailable_roots);
                 let mut st = status.write();
                 st.current_status = hint;
                 Self::emit_status(&app_handle, &st);
@@ -1202,7 +1220,7 @@ impl IndexerManager {
                 for path in &stale_paths {
                     store.remove(path);
                 }
-                println!(
+                crate::say!(
                     "[Kensaku Indexer] Removed {} stale metadata entries",
                     stale_paths.len()
                 );
@@ -1230,16 +1248,26 @@ impl IndexerManager {
                 } else if content_count == 0 {
                     "nothing changed".to_string()
                 } else if ocr_requeued {
-                    "OCR settings changed".to_string()
-                } else if given_up > 0 || !retry_paths.is_empty() {
-                    "files whose earlier extraction did not finish".to_string()
+                    format!("OCR settings changed ({pending_files} image/PDF pending)")
+                } else if pending_files > 0 || given_up > 0 || !retry_paths.is_empty() {
+                    format!(
+                        "{pending_files} files left pending by an earlier scan, {} retried, {given_up} given up on",
+                        retry_paths.len().saturating_sub(given_up)
+                    )
                 } else {
-                    "files changed on disk".to_string()
+                    // The bucket that needs the most scepticism: a genuine edit
+                    // and an unstable measurement look identical here, so name
+                    // the counts rather than asserting "changed on disk".
+                    format!(
+                        "{new_files} new, {restamped_files} with a different size or modification time"
+                    )
                 };
 
-                println!(
-                    "[Kensaku Indexer] scan done: {} entries, {} re-read ({})",
-                    files_count, content_count, reason
+                crate::say!(
+                    "[Kensaku Indexer] scan: {} entries, {} re-read: {}",
+                    files_count,
+                    content_count,
+                    reason
                 );
 
                 write_crawl_report(&CrawlReport {
@@ -1272,7 +1300,7 @@ impl IndexerManager {
                 Self::emit_status(&app_handle, &st);
             }
 
-            println!(
+            crate::say!(
                 "[Kensaku Indexer] Finished initial index: {} files ({} with full text)",
                 files_count, content_count
             );
@@ -1444,7 +1472,7 @@ impl IndexerManager {
         let mut fresh_index = match ContentIndex::new(&index_dir) {
             Ok(index) => Some(index),
             Err(e) => {
-                eprintln!(
+                crate::say_err!(
                     "[Kensaku] Rebuild failed: could not recreate the content index: {}",
                     e
                 );
@@ -1469,7 +1497,7 @@ impl IndexerManager {
             // Purge failed too: the crawl below still overwrites documents
             // for existing paths, but stale ones linger until a successful
             // rebuild. Loud enough to notice.
-            eprintln!(
+            crate::say_err!(
                 "[Kensaku] Rebuild: could not purge the old content index: {}",
                 e
             );
@@ -1747,10 +1775,10 @@ impl IndexerManager {
                 crate::ocr::set_engine(crate::ocr::ACCURATE);
                 match config.save() {
                     Ok(()) => {
-                        eprintln!("[Kensaku OCR] tesseract not found; switched to PP-OCR");
+                        crate::say_err!("[Kensaku OCR] tesseract not found; switched to PP-OCR");
                         *config_arc.write() = config.clone();
                     }
-                    Err(e) => eprintln!("[Kensaku OCR] could not save the engine switch: {e}"),
+                    Err(e) => crate::say_err!("[Kensaku OCR] could not save the engine switch: {e}"),
                 }
             }
             if crate::ocr::engine_name() == crate::ocr::ACCURATE && !crate::ocr::pack_present() {
@@ -1770,12 +1798,12 @@ impl IndexerManager {
             // Nothing can read images yet. Remembered, so the moment an
             // engine becomes usable the signature differs and everything is
             // re-read.
-            eprintln!("[Kensaku OCR] no OCR engine can run yet");
+            crate::say_err!("[Kensaku OCR] no OCR engine can run yet");
             return false;
         }
         crate::indexer::extract::clear_cache();
         let marked = metadata.write().mark_ocr_targets_pending();
-        eprintln!(
+        crate::say_err!(
             "[Kensaku OCR] using {} (revision {}); {} image/PDF file(s) queued for OCR",
             crate::ocr::usable_engine(),
             crate::ocr::OCR_REVISION,
@@ -1829,7 +1857,7 @@ impl IndexerManager {
         if caps_raised {
             crate::indexer::extract::clear_cache();
             let marked = self.metadata.write().mark_all_content_pending();
-            eprintln!("[Kensaku] Content caps raised: {marked} file(s) queued for re-read");
+            crate::say_err!("[Kensaku] Content caps raised: {marked} file(s) queued for re-read");
             reindex = true;
         }
         if ocr_changed {
@@ -1837,7 +1865,7 @@ impl IndexerManager {
             crate::ocr::set_engine(&config.ocr_engine);
             crate::indexer::extract::clear_cache();
             let marked = self.metadata.write().mark_ocr_targets_pending();
-            eprintln!(
+            crate::say_err!(
                 "[Kensaku] OCR {}: {} image(s) queued for re-scan",
                 if config.ocr_enabled {
                     "enabled"
@@ -1877,7 +1905,7 @@ impl IndexerManager {
                 } else {
                     self.metadata.write().mark_extensions_pending(&extensions)
                 };
-                eprintln!(
+                crate::say_err!(
                     "[Kensaku] External extractors changed; {} file(s) queued for re-scan",
                     marked
                 );
@@ -1932,10 +1960,10 @@ fn write_crawl_report(report: &CrawlReport) {
     match serde_json::to_string_pretty(report) {
         Ok(json) => {
             if let Err(e) = std::fs::write(crawl_report_path(), json) {
-                eprintln!("[Kensaku] could not record the crawl report: {e}");
+                crate::say_err!("[Kensaku] could not record the crawl report: {e}");
             }
         }
-        Err(e) => eprintln!("[Kensaku] could not serialise the crawl report: {e}"),
+        Err(e) => crate::say_err!("[Kensaku] could not serialise the crawl report: {e}"),
     }
 }
 
@@ -1957,7 +1985,7 @@ fn read_ocr_signature() -> Option<String> {
 
 fn write_ocr_signature(signature: &str) {
     if let Err(e) = std::fs::write(ocr_signature_path(), signature) {
-        eprintln!("[Kensaku OCR] could not record OCR state: {e}");
+        crate::say_err!("[Kensaku OCR] could not record OCR state: {e}");
     }
 }
 

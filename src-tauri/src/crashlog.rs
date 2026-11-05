@@ -59,6 +59,16 @@ fn panic_message(info: &std::panic::PanicHookInfo<'_>) -> String {
     }
 }
 
+/// True for the panic the std print macros raise when the output stream is
+/// gone. Not an application fault, so it must not become a crash-log entry.
+fn is_broken_pipe(message: &str) -> bool {
+    let lower = message.to_ascii_lowercase();
+    lower.contains("failed printing to stdout")
+        || lower.contains("failed printing to stderr")
+        || lower.contains("the pipe is being closed")
+        || lower.contains("broken pipe")
+}
+
 /// Installs the process-wide panic hook.
 ///
 /// Must be called once, as early as possible in `run()`, before the config is
@@ -68,6 +78,17 @@ pub fn install_panic_hook() {
     let previous = std::panic::take_hook();
 
     std::panic::set_hook(Box::new(move |info| {
+        // A closed stdout/stderr is not a crash in Kensaku: it means the
+        // terminal that launched the app went away, or a GUI process has no
+        // console. Recording it made the Health page report a failure on a
+        // perfectly healthy install, permanently, because the entry never
+        // ages out.
+        let message = panic_message(info);
+        if is_broken_pipe(&message) {
+            previous(info);
+            return;
+        }
+
         let location = info
             .location()
             .map(|location| {
@@ -80,12 +101,7 @@ pub fn install_panic_hook() {
             })
             .unwrap_or_else(|| "<unknown location>".to_string());
 
-        let mut entry = format!(
-            "[{}] {} {}\n",
-            now_unix_secs(),
-            location,
-            panic_message(info)
-        );
+        let mut entry = format!("[{}] {} {}\n", now_unix_secs(), location, message);
 
         // Only pay for a backtrace when the user asked for one; a forced
         // capture is expensive and very large on some platforms.
@@ -366,6 +382,16 @@ mod tests {
         assert!(line.ends_with(" ERROR indexer: disk full"));
 
         cleanup(&dir);
+    }
+
+    #[test]
+    fn broken_pipe_panics_are_not_crashes() {
+        // Exactly the entry that showed up in the field.
+        assert!(super::is_broken_pipe(
+            "failed printing to stderr: The pipe is being closed. (os error 232)"
+        ));
+        assert!(super::is_broken_pipe("failed printing to stdout: Broken pipe (os error 32)"));
+        assert!(!super::is_broken_pipe("index out of bounds: the len is 3"));
     }
 
     #[test]
