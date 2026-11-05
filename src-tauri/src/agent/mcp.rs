@@ -10,7 +10,7 @@
 //! explicitly enabled in config.
 
 use super::{
-    AgentSession, HeadlessIndex, agent_path_allowed, compose_query_scoped, now_unix_secs,
+    AgentSession, HeadlessIndex, agent_read_allowed, compose_query_scoped, now_unix_secs,
     truncate_chars,
 };
 use crate::config::KensakuConfig;
@@ -527,7 +527,13 @@ fn tool_regex_search(session: &AgentSession<'_>, args: &Value) -> Result<Value, 
         .map_err(|e| ToolFailure::Invalid(format!("Invalid params: invalid regex: {}", e)))?;
 
     let mode = parse_mode(args)?;
-    let composed = format!("re:{}", pattern);
+    // The lexer ends an unquoted value at the first whitespace, so a pattern
+    // containing a space was split into a regex plus separate terms and the
+    // caller silently got an AND of something they did not ask for.
+    let composed = format!(
+        "re:\"{}\"",
+        pattern.replace('\\', "\\\\").replace('"', "\\\"")
+    );
     let snippet_query = regex_snippet_literal(pattern);
     let mut payload = run_search(session, args, &composed, snippet_query.as_deref(), &mode)?;
     if let Some(object) = payload.as_object_mut() {
@@ -785,8 +791,13 @@ fn tool_read_snippet(session: &AgentSession<'_>, args: &Value) -> Result<Value, 
         .filter(|path| !path.is_empty())
         .ok_or_else(|| ToolFailure::Invalid("Invalid params: 'path' is required".to_string()))?;
 
-    // Scope enforcement applies to direct reads too.
-    if !agent_path_allowed(&session.scoped_roots(), path) {
+    // Scope enforcement applies to direct reads too, and secret-bearing files
+    // stay unreadable even when the whole tree is in scope.
+    if !agent_read_allowed(
+        &session.scoped_roots(),
+        &session.excluded_extensions(),
+        path,
+    ) {
         return Err(ToolFailure::Invalid(
             "Invalid params: path is outside the configured agent scope".to_string(),
         ));

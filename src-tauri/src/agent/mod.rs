@@ -118,6 +118,19 @@ impl HeadlessIndex {
     }
 
     /// Runs a query with a stable result offset (MCP pagination).
+    /// Extensions the index refuses to read content from.
+    pub fn excluded_extensions(&self) -> Vec<String> {
+        match self {
+            Self::Daemon => crate::daemon::request("get_config", json!({}))
+                .ok()
+                .and_then(|value| serde_json::from_value::<KensakuConfig>(value).ok())
+                .map(|config| config.excluded_extensions)
+                .unwrap_or_default(),
+            Self::Local(index) => index.config.excluded_extensions.clone(),
+            Self::None => Vec::new(),
+        }
+    }
+
     pub fn search_page(
         &self,
         query: &str,
@@ -630,6 +643,62 @@ pub fn agent_path_allowed(roots: &[String], path: &str) -> bool {
     roots.iter().any(|root| scope_contains(root, path))
 }
 
+/// Extensions a direct agent read must never return, whatever the scope says.
+///
+/// Indexing already excludes these by default (private keys, certificates,
+/// password databases); a single-path read must not be a way around that.
+const ALWAYS_DENIED_EXTENSIONS: &[&str] = &[
+    "pem", "key", "pfx", "p12", "crt", "cer", "kdbx", "gpg", "asc", "jks", "keystore",
+];
+
+/// Filenames that carry credentials regardless of extension.
+const ALWAYS_DENIED_NAMES: &[&str] = &[
+    ".env",
+    ".netrc",
+    ".pgpass",
+    "credentials",
+    "id_rsa",
+    "id_dsa",
+    "id_ecdsa",
+    "id_ed25519",
+    "known_hosts",
+    "secring.gpg",
+];
+
+/// Whether the agent surface may read `path` directly.
+///
+/// Scope answers "where"; this answers "what". An empty scope means the whole
+/// index is searchable, which is the documented default, but it must not also
+/// mean "and any file on disk": without this check `read_snippet` on an
+/// absolute path returned the contents of `~/.ssh/id_ed25519` to any connected
+/// MCP client, because a direct read never consults the indexing denylist.
+pub fn agent_read_allowed(roots: &[String], excluded_extensions: &[String], path: &str) -> bool {
+    if !agent_path_allowed(roots, path) {
+        return false;
+    }
+
+    let file_name = path.rsplit(['/', '\\']).next().unwrap_or(path);
+    let lower_name = file_name.to_ascii_lowercase();
+    if ALWAYS_DENIED_NAMES.contains(&lower_name.as_str()) {
+        return false;
+    }
+
+    let extension = lower_name
+        .rsplit_once('.')
+        .map(|(_, ext)| ext)
+        .unwrap_or_default();
+    if !extension.is_empty()
+        && (ALWAYS_DENIED_EXTENSIONS.contains(&extension)
+            || excluded_extensions
+                .iter()
+                .any(|excluded| excluded.trim_start_matches('.').eq_ignore_ascii_case(extension)))
+    {
+        return false;
+    }
+
+    true
+}
+
 /// Composes a Kensaku query from a base query plus one or more scope paths.
 ///
 /// Like [`compose_query`], but every scope path becomes an `in:"..."` token
@@ -804,6 +873,40 @@ mod scope_tests {
         std::fs::write(dir.join("sub/inside.txt"), "x").unwrap();
         std::fs::write(dir.with_extension("sibling"), "x").unwrap();
         dir
+    }
+
+    #[test]
+    fn direct_reads_refuse_credential_files() {
+        // No scope configured is the documented default, and it means the
+        // whole index is searchable. It must not also mean every file on disk
+        // is readable: this is how #95-class "agent read anything" bugs get in.
+        let roots: Vec<String> = Vec::new();
+        let excluded: Vec<String> = vec!["db".to_string(), "sqlite".to_string()];
+
+        assert!(agent_read_allowed(&roots, &excluded, "/home/u/notes.txt"));
+        assert!(agent_read_allowed(&roots, &excluded, "/home/u/project/README.md"));
+
+        // Known credential filenames.
+        assert!(!agent_read_allowed(&roots, &excluded, "/home/u/.ssh/id_ed25519"));
+        assert!(!agent_read_allowed(&roots, &excluded, "/home/u/id_rsa"));
+        assert!(!agent_read_allowed(&roots, &excluded, "/srv/app/.env"));
+
+        // Credential extensions, whatever the configured index excludes say.
+        assert!(!agent_read_allowed(&roots, &[], "/home/u/certs/server.pem"));
+        assert!(!agent_read_allowed(&roots, &[], "/home/u/private.KEY"));
+        assert!(!agent_read_allowed(&roots, &[], "/home/u/client.pfx"));
+
+        // Extensions the user excluded from the index are not readable either.
+        assert!(!agent_read_allowed(&roots, &excluded, "/home/u/app.sqlite"));
+        assert!(!agent_read_allowed(&roots, &excluded, "/home/u/state.db"));
+
+        // Scope still wins when it is configured.
+        let scoped = vec!["/home/u/project".to_string()];
+        assert!(!agent_read_allowed(
+            &scoped,
+            &excluded,
+            "/home/u/elsewhere/notes.txt"
+        ));
     }
 
     #[test]
