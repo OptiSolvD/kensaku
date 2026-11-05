@@ -603,20 +603,32 @@ impl MetadataStore {
                 }
             }
         }
-        // update nodes
+        // Snapshot the subtree before changing any name.
+        //
+        // `arena.path()` is reconstructed from the parent chain, so rewriting
+        // an ancestor's name changed every descendant's derived path. The
+        // single-pass version below that mutated as it scanned therefore
+        // matched the renamed root and then failed `strip_prefix(old)` for
+        // every child: only the root reached `old_paths`, it has no document
+        // of its own, and every `old/**` document stayed in the content index
+        // forever under a path that no longer exists.
+        let mut moved: Vec<(u32, PathBuf, PathBuf)> = Vec::new();
         for i in 0..self.arena.len() {
             let idx = i as u32;
             let p = self.arena.path(idx);
             let Ok(suffix) = p.strip_prefix(old) else {
                 continue;
             };
-            old_paths.push(p.clone());
-
             let new_path = if suffix.as_os_str().is_empty() {
                 new.to_path_buf()
             } else {
                 new.join(suffix)
             };
+            moved.push((idx, p, new_path));
+        }
+
+        for (idx, old_path, new_path) in moved {
+            old_paths.push(old_path);
             // update name (file_name) and char_bloom
             let new_name = new_path
                 .file_name()
