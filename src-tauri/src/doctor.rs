@@ -181,10 +181,13 @@ fn check_crash_log() -> DoctorCheck {
     const LABEL: &str = "Crash log";
 
     let path = crate::crashlog::path();
-    let last_line = crate::crashlog::tail(1).pop();
 
-    match (std::fs::metadata(&path), last_line) {
-        (Ok(meta), Some(line)) if meta.len() > 0 => warn(
+    // Only actual failures count. The file existing is not evidence of a
+    // crash: older builds logged routine startup milestones here, and a
+    // healthy install could show a warning whose text was the app's own
+    // "config loaded" line.
+    match crate::crashlog::last_failure() {
+        Some(line) => warn(
             ID,
             LABEL,
             line,
@@ -192,7 +195,7 @@ fn check_crash_log() -> DoctorCheck {
             // user's editor rather than trying to interpret the crash.
             Some(path.display().to_string()),
         ),
-        _ => ok(ID, LABEL, "No crash log entries.".to_string()),
+        None => ok(ID, LABEL, "No crash log entries.".to_string()),
     }
 }
 

@@ -18,11 +18,21 @@ const TAIL_READ_BYTES: u64 = 32 * 1024;
 
 const FILE_NAME: &str = "crash.log";
 
+/// Milestones go to their own file. A "crash log" that also carries routine
+/// startup lines is misleading in bug reports, and the doctor check cannot
+/// tell a clean start from a real failure when both land in the same file.
+const INFO_FILE_NAME: &str = "kensaku.log";
+
 /// Absolute path of the active crash log.
 ///
 /// Exposed so the doctor check can point the user at the file.
 pub fn path() -> PathBuf {
     KensakuConfig::config_dir().join(FILE_NAME)
+}
+
+/// Absolute path of the milestone log (non-failure startup and progress lines).
+pub fn info_path() -> PathBuf {
+    KensakuConfig::config_dir().join(INFO_FILE_NAME)
 }
 
 fn rotated_path(path: &Path) -> PathBuf {
@@ -186,11 +196,42 @@ pub fn record_error(context: &str, err: &str) {
 }
 
 /// Records a non-fatal startup/progress milestone.
+///
+/// Deliberately written to [`INFO_FILE_NAME`], not the crash log: milestones
+/// are not failures and must never be reported as one.
 pub fn info(message: &str) {
     append_line(
-        &path(),
+        &info_path(),
         &format!("[{}] INFO {}\n", now_unix_secs(), message),
     );
+}
+
+/// Whether a crash-log line describes a failure rather than a milestone.
+///
+/// Builds before 1.0.16 wrote `INFO` lines into `crash.log`, so an existing
+/// log can hold both. The timestamp prefix is bracketed and comes first;
+/// everything after it is the message.
+fn is_failure_line(line: &str) -> bool {
+    let body = match line.find(']') {
+        Some(end) => line[end + 1..].trim_start(),
+        None => line.trim_start(),
+    };
+    !body.starts_with("INFO ")
+}
+
+/// The most recent line in the crash log that describes an actual failure.
+///
+/// `None` means the log holds no failures, which is the normal state on a
+/// healthy install even when the file exists.
+pub fn last_failure() -> Option<String> {
+    last_failure_at(&path())
+}
+
+fn last_failure_at(path: &Path) -> Option<String> {
+    tail_from(path, 64)
+        .into_iter()
+        .rev()
+        .find(|line| is_failure_line(line))
 }
 
 fn record_error_at(path: &Path, context: &str, err: &str) {
@@ -323,6 +364,51 @@ mod tests {
             .expect("timestamp should be unix seconds");
         assert!(secs > 0);
         assert!(line.ends_with(" ERROR indexer: disk full"));
+
+        cleanup(&dir);
+    }
+
+    #[test]
+    fn info_milestones_are_not_failures() {
+        let (dir, log) = temp_log("info-classify");
+
+        // Two healthy startups, exactly the shape that made the doctor warn
+        // on a clean install.
+        append_line(&log, "[1793822770] INFO starting kensaku 1.0.15 (windows x86_64)\n");
+        append_line(
+            &log,
+            "[1793822771] INFO config loaded: setup_complete=false app_mode=launcher\n",
+        );
+
+        assert_eq!(last_failure_at(&log), None);
+        assert!(!is_failure_line(
+            "[1793822771] INFO config loaded: setup_complete=false"
+        ));
+
+        cleanup(&dir);
+    }
+
+    #[test]
+    fn last_failure_skips_newer_milestones() {
+        let (dir, log) = temp_log("failure-order");
+
+        append_line(&log, "[100] ERROR indexer: disk full\n");
+        append_line(&log, "[101] INFO config loaded: setup_complete=true\n");
+
+        // The failure is not the last line, but it is still the thing the
+        // user needs to see.
+        assert_eq!(
+            last_failure_at(&log).as_deref(),
+            Some("[100] ERROR indexer: disk full")
+        );
+
+        // A panic entry has no ERROR marker, only a location after the
+        // timestamp. It must still count.
+        append_line(&log, "[102] src/indexer/mod.rs:41:9 index out of bounds\n");
+        assert_eq!(
+            last_failure_at(&log).as_deref(),
+            Some("[102] src/indexer/mod.rs:41:9 index out of bounds")
+        );
 
         cleanup(&dir);
     }
