@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import React from "react";
@@ -88,6 +88,18 @@ export function SetupModal({ onSetupCompleted }: { onSetupCompleted: () => void 
   const [scanning, setScanning] = useState(false);
   const [scanStatus, setScanStatus] = useState<IndexingStatus | null>(null);
   const [done, setDone] = useState(false);
+  /* The semantic model downloads once, in the background, after setup is
+     saved. When that fails nothing said so: the failure handler was a
+     console.warn, so a new install could end up with keyword-only search and
+     no indication. Setup now reports it and offers the retry, which is the
+     only place a first-run user should have to look. */
+  const [modelStatus, setModelStatus] = useState<ModelsStatus | null>(null);
+  const [modelBusy, setModelBusy] = useState(false);
+  const [modelError, setModelError] = useState<string | null>(null);
+  /* Number of successful status polls. A download takes a moment to register
+     in the status, so the failure panel waits for a few reads rather than
+     flashing on the first one. */
+  const [modelPolls, setModelPolls] = useState(0);
   const etaRef = useRef<{ phase: string; done: number; at: number; total: number }>({
     phase: "",
     done: 0,
@@ -197,6 +209,43 @@ export function SetupModal({ onSetupCompleted }: { onSetupCompleted: () => void 
     return () => window.clearInterval(id);
   }, [step, ocrPackStatus?.downloading]);
 
+  // Poll the model download while scanning: it runs alongside the first crawl
+  // and its outcome is reported on the scan screen.
+  useEffect(() => {
+    if (!scanning) return;
+    let cancelled = false;
+    const tick = () => {
+      invoke<ModelsStatus>("get_models_status")
+        .then((status) => {
+          if (!cancelled) {
+            setModelStatus(status);
+            setModelPolls((n) => n + 1);
+          }
+        })
+        .catch(() => undefined);
+    };
+    tick();
+    const id = window.setInterval(tick, 1200);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [scanning]);
+
+  const retryModelDownload = useCallback(async () => {
+    setModelBusy(true);
+    setModelError(null);
+    try {
+      await invoke("download_models");
+      const status = await invoke<ModelsStatus>("get_models_status");
+      setModelStatus(status);
+    } catch (err) {
+      setModelError(String(err));
+    } finally {
+      setModelBusy(false);
+    }
+  }, []);
+
   // Poll indexing status while scanning; finish when the crawl completes.
   useEffect(() => {
     if (!scanning || done) return;
@@ -289,7 +338,10 @@ export function SetupModal({ onSetupCompleted }: { onSetupCompleted: () => void 
       });
       // The default text model downloads without asking. Failure is not fatal:
       // keyword search works without it, and Settings can retry.
-      invoke("download_models").catch((err) => console.warn("Model download did not start:", err));
+      invoke("download_models").catch((err) => {
+        console.warn("Model download did not start:", err);
+        setModelError(String(err));
+      });
       // Start at sign-in is on by default (see `startAtLogin`).
       if (startAtLogin) {
         await invoke("set_autostart", { enabled: true }).catch((err) =>
@@ -428,6 +480,31 @@ export function SetupModal({ onSetupCompleted }: { onSetupCompleted: () => void 
             </div>
           </div>
         </div>
+        {/* Only when the automatic download failed. A first-run user should
+            never have to hunt for this later in Settings. */}
+        {modelStatus &&
+          modelPolls >= 3 &&
+          !modelStatus.ready &&
+          !modelStatus.downloading &&
+          !modelBusy && (
+          <div className="flex items-center justify-between gap-4 rounded-control border border-line bg-elevated px-3 py-2.5">
+            <div className="min-w-0">
+              <p className="text-[12px] font-medium text-fg">{t("scan.modelFailedTitle")}</p>
+              <p className="pt-0.5 text-[12px] leading-[18px] text-muted">
+                {modelError ?? t("scan.modelFailedBody")}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={retryModelDownload}
+              disabled={modelBusy}
+              className="btn btn-secondary h-8 shrink-0 px-3 text-[11px]"
+            >
+              {modelBusy ? t("scan.modelRetrying") : t("scan.modelRetry")}
+            </button>
+          </div>
+        )}
+
         <Footer>
           <p className="text-[12px] text-subtle">{t("scan.onlyFirstTime")}</p>
           <span />

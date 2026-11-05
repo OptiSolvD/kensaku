@@ -37,7 +37,11 @@
       "seconds": "~{{seconds}}s left",
       "minutes": "~{{minutes}}m {{seconds}}s left",
       "hours": "~{{hours}}h {{minutes}}m left"
-    }
+    },
+    "modelFailedTitle": "Semantic search is not ready",
+    "modelFailedBody": "The model files did not download. Keyword search works without them.",
+    "modelRetry": "Retry download",
+    "modelRetrying": "Retrying…"
   },
   "folders": {
     "title": "Where do your files live?",

@@ -37,7 +37,11 @@
       "seconds": "约 {{seconds}} 秒",
       "minutes": "约 {{minutes}} 分 {{seconds}} 秒",
       "hours": "约 {{hours}} 小时 {{minutes}} 分"
-    }
+    },
+    "modelFailedTitle": "语义搜索尚未就绪",
+    "modelFailedBody": "模型文件未下载成功。没有它们仍可使用关键词搜索。",
+    "modelRetry": "重试下载",
+    "modelRetrying": "重试中…"
   },
   "folders": {
     "title": "你的文件在哪里？",
