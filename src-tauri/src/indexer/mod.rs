@@ -611,10 +611,10 @@ impl IndexerManager {
                 armed: true,
             };
 
-            // Apply OCR settings and re-queue images/PDFs when what OCR would
-            // produce has changed. Runs before the walk, so this same crawl
-            // re-reads them.
-            Self::sync_ocr_state(&config_arc, &metadata);
+            // Apply OCR engine selection and record whether it re-queued
+            // images: that is one of the reasons a crawl re-reads files, and
+            // the report below has to say why.
+            let ocr_requeued = Self::sync_ocr_state(&config_arc, &metadata);
 
             let (watched_dirs, excluded_dirs, excluded_exts, crawl_mode, include_ignored) = {
                 let cfg = config_arc.read();
@@ -1202,6 +1202,38 @@ impl IndexerManager {
             }
 
             last_reconcile_unix_secs.store(now_unix_secs(), Ordering::Relaxed);
+
+            // Record what this crawl actually did, so "indexing runs every
+            // time I open the app" can be diagnosed from the Health tab
+            // instead of guessed at. Reasons are checked in the order they are
+            // set below the crawl, widest first: a schema rebuild re-reads
+            // everything, so it explains the rest.
+            {
+                let rebuild_reason = content_index
+                    .read()
+                    .as_ref()
+                    .and_then(|index| index.rebuild_reason.clone());
+                let reason = if let Some(reason) = rebuild_reason {
+                    format!("content index rebuilt: {reason}")
+                } else if content_count == 0 {
+                    "nothing changed".to_string()
+                } else if ocr_requeued {
+                    "OCR settings changed".to_string()
+                } else if given_up > 0 || !retry_paths.is_empty() {
+                    "files whose earlier extraction did not finish".to_string()
+                } else {
+                    "files changed on disk".to_string()
+                };
+
+                write_crawl_report(&CrawlReport {
+                    at: now_unix_secs(),
+                    walked: files_count,
+                    reindexed: content_count,
+                    retried: retry_paths.len().saturating_sub(given_up),
+                    abandoned: given_up,
+                    reason,
+                });
+            }
 
             // First-scan completion gate: the first full crawl marks setup done.
             {
@@ -1854,6 +1886,48 @@ impl IndexerManager {
 }
 
 /// Where the OCR signature of the current index is recorded.
+/// What the last crawl actually did.
+///
+/// Written at the end of every crawl so the reason a launch re-read files is
+/// visible after the fact. Without it, "indexing runs on every start" cannot
+/// be told apart from an ordinary reconcile: the diagnostics only went to
+/// stderr, which a packaged build never shows anyone.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct CrawlReport {
+    pub at: u64,
+    /// Files and folders the walk visited.
+    pub walked: usize,
+    /// Files whose content was extracted (i.e. actually re-read).
+    pub reindexed: usize,
+    /// Files left pending for a retry after this crawl.
+    pub retried: usize,
+    /// Files dropped from the retry loop (retry budget exhausted).
+    pub abandoned: usize,
+    /// Why anything was reindexed. "nothing changed" when nothing was.
+    pub reason: String,
+}
+
+fn crawl_report_path() -> std::path::PathBuf {
+    KensakuConfig::config_dir().join("crawl-last.json")
+}
+
+fn write_crawl_report(report: &CrawlReport) {
+    match serde_json::to_string_pretty(report) {
+        Ok(json) => {
+            if let Err(e) = std::fs::write(crawl_report_path(), json) {
+                eprintln!("[Kensaku] could not record the crawl report: {e}");
+            }
+        }
+        Err(e) => eprintln!("[Kensaku] could not serialise the crawl report: {e}"),
+    }
+}
+
+/// The last recorded crawl, for the doctor and for support.
+pub fn last_crawl_report() -> Option<CrawlReport> {
+    let raw = std::fs::read_to_string(crawl_report_path()).ok()?;
+    serde_json::from_str(&raw).ok()
+}
+
 fn ocr_signature_path() -> PathBuf {
     KensakuConfig::config_dir().join("ocr-state")
 }

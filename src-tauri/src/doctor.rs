@@ -110,6 +110,18 @@ fn format_bytes(bytes: u64) -> String {
     }
 }
 
+/// "just now", "12 min ago", "3 h ago", "2 d ago".
+fn format_age(at_unix_secs: u64) -> String {
+    let now = now_unix_secs();
+    let secs = now.saturating_sub(at_unix_secs);
+    match secs {
+        0..=59 => "just now".to_string(),
+        60..=3599 => format!("{} min ago", secs / 60),
+        3600..=86_399 => format!("{} h ago", secs / 3600),
+        _ => format!("{} d ago", secs / 86_400),
+    }
+}
+
 fn check_config_dir_writable() -> DoctorCheck {
     const ID: &str = "config_dir";
     const LABEL: &str = "Config directory writable";
@@ -338,6 +350,51 @@ fn check_full_text_index(nodes: usize) -> DoctorCheck {
     };
 
     ok(ID, LABEL, detail)
+}
+
+/// What the last crawl did, so "it indexes every time I open it" can be
+/// answered from the Health tab rather than from stderr a release build never
+/// shows anyone.
+fn check_last_crawl() -> DoctorCheck {
+    let Some(report) = crate::indexer::last_crawl_report() else {
+        return ok(
+            "last_crawl",
+            "Last index scan",
+            "No crawl recorded yet.".to_string(),
+        );
+    };
+
+    let when = format_age(report.at);
+    let mut detail = format!(
+        "{}: scanned {} entries, re-read {}, reason: {}",
+        when, report.walked, report.reindexed, report.reason
+    );
+    if report.retried > 0 {
+        detail.push_str(&format!(", {} pending a retry", report.retried));
+    }
+    if report.abandoned > 0 {
+        detail.push_str(&format!(
+            ", {} given up on after repeated failures",
+            report.abandoned
+        ));
+    }
+
+    // A launch that re-reads a large share of the corpus without a schema
+    // rebuild or an OCR change is the pattern worth flagging.
+    let heavy = report.reindexed > 0
+        && report.walked > 0
+        && report.reindexed * 2 > report.walked
+        && !report.reason.starts_with("content index rebuilt");
+    if heavy {
+        return warn(
+            "last_crawl",
+            "Last index scan",
+            detail,
+            Some("Report this: the scan re-read most of the corpus, which it should only do once after an upgrade.".to_string()),
+        );
+    }
+
+    ok("last_crawl", "Last index scan", detail)
 }
 
 fn check_semantic_index(units: usize) -> DoctorCheck {
@@ -787,6 +844,7 @@ pub fn run(state: &AppState) -> DoctorReport {
         check_crash_log(),
         check_metadata_db(&config_dir),
         check_full_text_index(nodes),
+        check_last_crawl(),
         check_semantic_index(units),
         check_watched_folders(state),
         check_watcher(state),

@@ -365,6 +365,22 @@ pub const MAX_REGEX_PATTERN_LEN: usize = 1024;
 /// v2: K15 schema (CJK-aware "kensaku" tokenizer on filename and content)
 /// v3: ext/size fields for filter pushdown (K12/B4)
 pub const CONTENT_SCHEMA_VERSION: u32 = 3;
+
+/// Records the schema version the schema version this index was written with.
+///
+/// This used to swallow its error. A failed write leaves the marker at version
+/// 0, so the next launch reads a stale schema, rebuilds the whole index, and
+/// re-extracts every file on every single start, silently.
+fn write_schema_marker(path: &std::path::Path) {
+    if let Err(error) = fs::write(path, CONTENT_SCHEMA_VERSION.to_string()) {
+        log::error!(
+            "[Kensaku] could not record the content schema version at {}: {}",
+            path.display(),
+            error
+        );
+    }
+}
+
 pub const SCHEMA_MARKER_FILE: &str = "content.schema";
 
 impl ContentIndex {
@@ -446,13 +462,13 @@ impl ContentIndex {
                 rebuilt = true;
                 let new_index =
                     Index::create_in_dir(index_dir, schema.clone()).map_err(|e| e.to_string())?;
-                let _ = fs::write(&marker_path, CONTENT_SCHEMA_VERSION.to_string());
+                write_schema_marker(&marker_path);
                 new_index
             }
         } else {
             let new_index =
                 Index::create_in_dir(index_dir, schema.clone()).map_err(|e| e.to_string())?;
-            let _ = fs::write(&marker_path, CONTENT_SCHEMA_VERSION.to_string());
+            write_schema_marker(&marker_path);
             new_index
         };
         index
