@@ -481,6 +481,11 @@ fn is_path_excluded(path: &Path, cfg: &KensakuConfig) -> bool {
     if starts_with_any(path, &prunes_for_roots(&cfg.watched_dirs)) {
         return true;
     }
+    // Honour the ignore files the crawler used, so the watcher and the crawl
+    // agree about what belongs in the index.
+    if crate::indexer::ignore::is_active_ignored(path, path.is_dir()) {
+        return true;
+    }
     path.components().any(|component| {
         component
             .as_os_str()

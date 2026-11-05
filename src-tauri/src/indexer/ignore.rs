@@ -39,10 +39,33 @@ struct Rule {
 }
 
 /// Parsed ignore rules grouped by the directory that defines them.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct IgnoreSet {
     rules: BTreeMap<PathBuf, Vec<Rule>>,
     case_insensitive: bool,
+}
+
+/// The rules from the most recent crawl, for code that runs between crawls.
+///
+/// The watcher used to apply no ignore rules at all, so touching anything
+/// under `dist/`, `.venv/` or a `.cursorignore` entry indexed it and the next
+/// crawl dropped it again: the index flip-flopped on every build.
+static ACTIVE: std::sync::RwLock<Option<IgnoreSet>> = std::sync::RwLock::new(None);
+
+/// Publishes the rules the crawler just used, so the watcher agrees with it.
+pub fn set_active(set: IgnoreSet) {
+    if let Ok(mut slot) = ACTIVE.write() {
+        *slot = Some(set);
+    }
+}
+
+/// Whether the current crawl's ignore rules exclude `path`.
+pub fn is_active_ignored(path: &Path, is_dir: bool) -> bool {
+    ACTIVE
+        .read()
+        .ok()
+        .and_then(|slot| slot.as_ref().map(|set| set.is_ignored(path, is_dir)))
+        .unwrap_or(false)
 }
 
 impl IgnoreSet {

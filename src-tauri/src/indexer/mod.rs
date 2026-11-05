@@ -22,7 +22,7 @@ use crate::search::{SearchDispatcher, SearchResponse, SortOrder};
 use parking_lot::{Mutex, RwLock};
 use serde::{Deserialize, Serialize};
 use std::cmp::Reverse;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
@@ -583,6 +583,28 @@ impl IndexerManager {
         let watcher_ok = Arc::clone(&self.watcher_ok);
 
         thread::spawn(move || {
+            // A panic anywhere in the crawl (an extractor, a rayon scope, an
+            // embedding call) used to leave the gate set for the rest of the
+            // process lifetime: every later crawl and rebuild returned
+            // immediately and the index never updated again, with no error
+            // shown. The guard hands the gate back on unwind; the normal path
+            // releases it explicitly and disarms this.
+            struct GateGuard {
+                gate: Arc<std::sync::atomic::AtomicBool>,
+                armed: bool,
+            }
+            impl Drop for GateGuard {
+                fn drop(&mut self) {
+                    if self.armed {
+                        self.gate.store(false, Ordering::SeqCst);
+                    }
+                }
+            }
+            let mut gate_guard = GateGuard {
+                gate: Arc::clone(&is_running),
+                armed: true,
+            };
+
             // Apply OCR settings and re-queue images/PDFs when what OCR would
             // produce has changed. Runs before the walk, so this same crawl
             // re-reads them.
@@ -1079,18 +1101,45 @@ impl IndexerManager {
                 Self::emit_status(&app_handle, &st);
             }
 
+            // A directory the crawl could not read (permissions, a locked
+            // file, a network hiccup, a Windows path over MAX_PATH) is not
+            // "its contents were deleted". Only whole roots were protected, so
+            // one unreadable subfolder dropped its entire subtree from the
+            // index and recovering it needed a full re-extraction.
+            //
+            // Cached per directory: the sweep asks about every stale
+            // candidate, and a deleted tree shares one parent.
+            let mut parent_unreadable: HashMap<PathBuf, bool> = HashMap::new();
+            let mut is_protected_by_unreadable_parent = |path: &std::path::Path| -> bool {
+                let Some(parent) = path.parent() else {
+                    return false;
+                };
+                if let Some(known) = parent_unreadable.get(parent) {
+                    return *known;
+                }
+                // NotFound means the parent really is gone, so the child is
+                // really gone. Any other error means we could not look.
+                let unreadable = match std::fs::read_dir(parent) {
+                    Ok(_) => false,
+                    Err(error) => error.kind() != std::io::ErrorKind::NotFound,
+                };
+                parent_unreadable.insert(parent.to_path_buf(), unreadable);
+                unreadable
+            };
+
             // Drop metadata entries for files that no longer exist on disk.
             let stale_paths: Vec<PathBuf> = {
                 let store = metadata.read();
                 (0..store.len())
                     .filter_map(|i| {
                         let e = store.materialize(i as u32);
-                        if !crawled_paths.contains(&e.path) && !belongs_to_unavailable_root(&e.path)
+                        if crawled_paths.contains(&e.path)
+                            || belongs_to_unavailable_root(&e.path)
+                            || is_protected_by_unreadable_parent(&e.path)
                         {
-                            Some(e.path)
-                        } else {
-                            None
+                            return None;
                         }
+                        Some(e.path)
                     })
                     .collect()
             };
@@ -1180,6 +1229,7 @@ impl IndexerManager {
             }
 
             is_running.store(false, Ordering::SeqCst);
+            gate_guard.armed = false;
 
             // Fill in perceptual hashes that the crawl skipped, one image at a
             // time. Safe to start here: the crawl transaction is committed and

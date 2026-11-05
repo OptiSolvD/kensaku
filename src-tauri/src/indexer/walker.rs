@@ -360,9 +360,17 @@ pub fn walk_directories(
 
     // Ignore parity: probe each visited directory for `.gitignore` /
     // `.cursorignore` and drop ignored entries.
-    if !include_ignored {
-        let ignore_set = IgnoreSet::from_directories(&ignore_dirs);
-        if !ignore_set.is_empty() {
+    {
+        let ignore_set = if include_ignored {
+            IgnoreSet::empty()
+        } else {
+            IgnoreSet::from_directories(&ignore_dirs)
+        };
+        // The watcher runs between crawls and has no directory list of its
+        // own; it reads these rules so an edit inside an ignored tree does not
+        // put the file back into the index.
+        crate::indexer::ignore::set_active(ignore_set.clone());
+        if !include_ignored && !ignore_set.is_empty() {
             result.retain(|entry| !ignore_set.is_ignored(&entry.path, entry.is_dir));
         }
     }
