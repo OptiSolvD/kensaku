@@ -108,6 +108,7 @@ impl MetadataDb {
             "ALTER TABLE nodes ADD COLUMN ino INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE nodes ADD COLUMN indexed_gen INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE nodes ADD COLUMN content_hash TEXT",
+            "ALTER TABLE nodes ADD COLUMN retry_count INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE nodes ADD COLUMN width INTEGER",
             "ALTER TABLE nodes ADD COLUMN height INTEGER",
             "ALTER TABLE nodes ADD COLUMN phash INTEGER",
@@ -337,7 +338,8 @@ impl MetadataDb {
                width = CASE WHEN nodes.modified != excluded.modified OR nodes.size != excluded.size THEN NULL ELSE nodes.width END,
                height = CASE WHEN nodes.modified != excluded.modified OR nodes.size != excluded.size THEN NULL ELSE nodes.height END,
                phash = CASE WHEN nodes.modified != excluded.modified OR nodes.size != excluded.size THEN NULL ELSE nodes.phash END,
-               indexed_gen = CASE WHEN nodes.modified != excluded.modified OR nodes.size != excluded.size THEN 0 ELSE nodes.indexed_gen END
+               indexed_gen = CASE WHEN nodes.modified != excluded.modified OR nodes.size != excluded.size THEN 0 ELSE nodes.indexed_gen END,
+               retry_count = CASE WHEN nodes.modified != excluded.modified OR nodes.size != excluded.size THEN 0 ELSE nodes.retry_count END
              RETURNING id",
             params![
                 entry.path.to_string_lossy().to_string(),
@@ -1299,7 +1301,10 @@ impl MetadataDb {
     /// Marks every file as needing a content re-read.
     pub fn mark_all_content_pending(&self) -> Result<usize, String> {
         let conn = self.conn.lock();
-        conn.execute("UPDATE nodes SET content_pending = 1 WHERE is_dir = 0", [])
+        conn.execute(
+            "UPDATE nodes SET content_pending = 1, retry_count = 0 WHERE is_dir = 0",
+            [],
+        )
             .map_err(|e| format!("Failed to mark all content pending: {}", e))
     }
 
@@ -1314,12 +1319,49 @@ impl MetadataDb {
         Ok(())
     }
 
+    /// How many times extraction has been attempted and left pending, and
+    /// whether another attempt is still worthwhile.
+    ///
+    /// A file that times out, or whose slot was saturated, is marked pending
+    /// and re-read on the next crawl. Without a cap, a file that always times
+    /// out was re-read on *every* launch, forever: the crawl never settled,
+    /// indexing appeared to run every time the app opened, and the same
+    /// expensive file was decoded again on each start.
+    pub fn record_retry(&self, path: &Path, max_attempts: u32) -> Result<bool, String> {
+        let path_str = path.to_string_lossy().to_string();
+        let conn = self.conn.lock();
+        conn.execute(
+            "UPDATE nodes SET retry_count = retry_count + 1 WHERE path = ?1",
+            params![&path_str],
+        )
+        .map_err(|e| format!("Failed to record a retry for '{}': {}", path.display(), e))?;
+        let attempts: i64 = conn
+            .query_row(
+                "SELECT retry_count FROM nodes WHERE path = ?1",
+                params![&path_str],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
+        if attempts >= i64::from(max_attempts) {
+            // Stop retrying until the file changes or OCR settings change.
+            // `content_pending` cleared means the next crawl skips it, so the
+            // launch reconcile goes quiet instead of repeating the same cost.
+            conn.execute(
+                "UPDATE nodes SET content_pending = 0 WHERE path = ?1",
+                params![&path_str],
+            )
+            .map_err(|e| format!("Failed to stop retrying '{}': {}", path.display(), e))?;
+            return Ok(false);
+        }
+        Ok(true)
+    }
+
     /// Marks every image *and every PDF* for a content re-read: what OCR
     /// produces changed, and scanned PDFs are OCR'd too.
     pub fn mark_ocr_targets_pending(&self) -> Result<usize, String> {
         let conn = self.conn.lock();
         conn.execute(
-            "UPDATE nodes SET content_pending = 1
+            "UPDATE nodes SET content_pending = 1, retry_count = 0
              WHERE is_dir = 0
                AND lower(extension) IN ('png','jpg','jpeg','gif','webp','bmp','tiff','tif','pdf')",
             [],

@@ -124,6 +124,12 @@ struct ExtractedWork {
     retry: bool,
 }
 
+/// How many crawls a file may fail extraction on before it is left alone
+/// until it changes. Timeouts and slot saturation are usually persistent for
+/// a given file (a huge scan, a locked network file), so an unbounded retry
+/// just repeats the same cost on every launch.
+const MAX_EXTRACTION_ATTEMPTS: u32 = 3;
+
 fn fnv_hash(data: &str) -> u64 {
     let mut h: u64 = 0xcbf29ce484222325;
     for b in data.as_bytes() {
@@ -1065,13 +1071,34 @@ impl IndexerManager {
                 }
                 metadata.write().clear_content_pending(path);
             }
+            // Retry, but a bounded number of times. A file that always times
+            // out used to be re-read on every single launch, so the crawl never
+            // settled and launching the app meant waiting for the same
+            // expensive files again. After the cap the file is left alone
+            // until it changes on disk or OCR settings change, which is what
+            // resets the counter.
+            let mut given_up = 0usize;
             for path in &retry_paths {
-                metadata.write().set_content_pending(path);
+                let keep_trying = metadata
+                    .read()
+                    .db()
+                    .map(|db| db.record_retry(path, MAX_EXTRACTION_ATTEMPTS).unwrap_or(true))
+                    .unwrap_or(true);
+                if keep_trying {
+                    metadata.write().set_content_pending(path);
+                } else {
+                    given_up += 1;
+                }
             }
             if !retry_paths.is_empty() {
                 println!(
-                    "[Kensaku Indexer] {} file(s) left pending for retry (timeout or OCR not ready)",
-                    retry_paths.len()
+                    "[Kensaku Indexer] {} file(s) left pending for retry (timeout or busy){}",
+                    retry_paths.len() - given_up,
+                    if given_up > 0 {
+                        format!(", {given_up} given up on after {MAX_EXTRACTION_ATTEMPTS} attempts")
+                    } else {
+                        String::new()
+                    }
                 );
             }
 
