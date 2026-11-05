@@ -214,20 +214,16 @@ pub fn remove_all_data() -> Result<RemovalReport, String> {
 }
 
 /// What a reset removes.
-#[derive(Debug, Clone, Copy)]
+///
+/// `Default` is `remove_packs: false`: a reset clears user state and keeps the
+/// downloaded packs, because they are reproducible only by downloading them
+/// again and they are not the user's data.
+#[derive(Debug, Clone, Copy, Default)]
 pub struct ResetScope {
     /// Also delete downloaded OCR and model packs. Off by default: they are
     /// reproducible only by downloading them again, and they are not the
     /// user's data.
     pub remove_packs: bool,
-}
-
-impl Default for ResetScope {
-    fn default() -> Self {
-        Self {
-            remove_packs: false,
-        }
-    }
 }
 
 /// Clears user state, keeping the data directory itself.
