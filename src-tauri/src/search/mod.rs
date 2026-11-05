@@ -7,7 +7,6 @@ use crate::indexer::walker::FileEntry;
 use crate::query::ast::{ActiveFilterDto, Filter, Mode, TermField};
 use crate::query::parse_query;
 use crate::search::fuzzy::FuzzySearcher;
-use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};

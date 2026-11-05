@@ -730,11 +730,15 @@ impl MetadataStore {
     /// existed.
     pub fn entries_snapshot(&self) -> Arc<Vec<crate::indexer::walker::FileEntry>> {
         let current_gen = self.generation.load(Ordering::SeqCst);
-        if let Ok(cache) = self.cached_entries.read()
-            && let Some((cached_gen, entries)) = cache.as_ref()
-            && *cached_gen == current_gen
+        // `parking_lot` locks are not poisoned, so there is no Result to unwrap
+        // here: the same shape as `cached_trie` above.
         {
-            return Arc::clone(entries);
+            let cache = self.cached_entries.read();
+            if let Some((cached_gen, entries)) = cache.as_ref()
+                && *cached_gen == current_gen
+            {
+                return Arc::clone(entries);
+            }
         }
 
         let built = Arc::new(
@@ -742,9 +746,7 @@ impl MetadataStore {
                 .map(|index| self.materialize(index as u32))
                 .collect::<Vec<_>>(),
         );
-        if let Ok(mut cache) = self.cached_entries.write() {
-            *cache = Some((current_gen, Arc::clone(&built)));
-        }
+        *self.cached_entries.write() = Some((current_gen, Arc::clone(&built)));
         built
     }
 
