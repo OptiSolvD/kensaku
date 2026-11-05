@@ -3,6 +3,67 @@
 All notable changes to Kensaku. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning: [SemVer](https://semver.org/).
 
+## [1.0.16] — 2026-11-05
+
+### Fixed
+- **The launcher hid itself on right-click and on the sort control** (#95). It dismissed on
+  any window blur, and two things blur the webview without the user leaving: there was no
+  context menu handler, so WebKitGTK drew its own, and the sort control was a native
+  `<select>` whose popup is a separate window on Linux. The context menu is suppressed, sort
+  is an in-app listbox, and dismissal now ignores focus-stealing popups while still hiding on
+  a real click-away.
+- **A clean install reported its own startup log as a crash** (#94). Milestones now go to
+  `kensaku.log`, and the health check only reports lines that describe a failure.
+- **The Windows portable build shipped without OCR** (#94). The zip was assembled by hand and
+  omitted `onnxruntime.dll`, so Indra and PP-OCR could never load on a portable install. The
+  library now ships in the zip and the build fails if it is missing.
+- **Tesseract read every image as English** (#107, #110). `-l` was never passed, whatever
+  language data was installed. Languages are now selectable in Settings → Search.
+- **Renaming a folder left its documents behind in the index** for ever, because the rename
+  path rewrote parent names while deriving child paths.
+- **An unreadable folder deleted its whole subtree from the index.** One locked or
+  permission-denied directory was indistinguishable from "everything inside was deleted".
+- **The watcher ignored `.gitignore` and `.cursorignore`**, so build artifacts entered the
+  index on every build and were removed again by the next crawl.
+- **A panic during indexing left the index frozen for the rest of the session**: the crawl
+  gate was never released, so every later crawl and rebuild returned immediately.
+- **Changing the excluded-extension list never removed files already indexed.**
+- **Files over 1 MB ignored the "deep content" setting** and always indexed 512 KB from each
+  end; the watcher also capped re-indexed files at 100 KB.
+- **Reset could close the app and never reopen it**: the replacement process lost the
+  single-instance lock race. The lock is released before restarting.
+- **Two windows could run at once** when the daemon was present, and `--toggle` started a
+  second app instead of summoning the first.
+- **Updates had no timeout, no integrity check, and installed truncated downloads.** Every
+  request is now bounded, the download is compared with the expected size and verified
+  against the release's `SHA256SUMS`, and portable installs are told to update the folder
+  instead of being handed a second installation.
+- **Escape in Settings silently discarded unsaved edits.**
+- **IME input opened files.** The Enter that commits a Chinese or Japanese candidate also
+  opened the selected result.
+- **Tab trapped keyboard focus** in the result list, so nothing else was reachable.
+- **Enter, Space, Cmd+C and Cmd+I acted on the previous query's rows** while a search was in
+  flight.
+- **MCP could read any file on the machine.** `read_snippet` took an absolute path straight to
+  disk, so an empty agent scope (the default) allowed reading `~/.ssh/id_ed25519`. Credential
+  files and excluded extensions are now refused.
+- **Settings switches had no accessible name** for screen readers.
+
+### Changed
+- **Search does far less work per keystroke**: filters no longer lowercase every filename and
+  path in the corpus, and name sorting no longer allocates inside the comparator.
+- **Scanned PDFs are OCR'd one page at a time.** The whole document used to be decoded first,
+  around 3 GB for a 20-page scan.
+- **Snippets now load for rows scrolled into view**, hover details are fetched on hover
+  instead of once per card per search, and stats polling pauses while the window is hidden.
+- **Two missing SQLite indexes** made the embedding queue and image burst grouping full-scan
+  the nodes table repeatedly.
+
+### Added
+- `Cmd/Ctrl+Shift+L` toggles grid and list view (#47).
+- OCR language picker in Settings → Search.
+- Frontend unit tests (`vitest`), run in CI.
+
 ## [1.0.15] — 2026-11-04
 
 ### Fixed
