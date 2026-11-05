@@ -36,6 +36,7 @@ import { normalizeTheme } from "./hooks/useTheme";
 import { useLanguage } from "./hooks/useLanguage";
 import { PreviewDialog } from "./components/PreviewDialog";
 import { classify } from "./lib/categories";
+import { shouldHideOnBlur } from "./lib/dismiss";
 import { interpretationLabel } from "./lib/interpretation";
 import { inFilter } from "./lib/query";
 import { isNewerVersion } from "./lib/version";
@@ -209,7 +210,9 @@ function App() {
     ro.observe(el);
     setBarHeight(el.offsetHeight);
     return () => ro.disconnect();
-  });
+    // Mount-only: with no dependency array this rebuilt the observer and
+    // forced a layout read after every render, i.e. on every keystroke.
+  }, []);
   const resultsContainerRef = useRef<HTMLDivElement>(null);
 
   /** Number of cards in the first grid row (1 in list view). Measured from
@@ -234,6 +237,9 @@ function App() {
     return Math.max(1, count);
   }, []);
   const currentSeqRef = useRef(0);
+  /* The query the rows on screen were produced for. Kept apart from `query`
+     so a keypress during the debounce window cannot act on a stale row. */
+  const resultsQueryRef = useRef("");
   /** Query at the time the current effect run scheduled its requests —
    *  snippet merges are discarded if the user has typed since. */
   const queryRef = useRef(query);
@@ -307,6 +313,7 @@ function App() {
 
     const trimmed = query.trim();
     if (trimmed === "") {
+      resultsQueryRef.current = "";
       setResults([]);
       setActiveFilters([]);
       setHints([]);
@@ -317,6 +324,7 @@ function App() {
     }
 
     if (query.trim().startsWith("/")) {
+      resultsQueryRef.current = "";
       setResults([]);
       setActiveFilters([]);
       setHints([]);
@@ -355,6 +363,7 @@ function App() {
               if (!seen.has(p)) fetchedSnippetsRef.delete(p);
             }
           }
+          resultsQueryRef.current = query.trim();
           setResults(merged);
           setTotal(res.total ?? merged.length);
           setActiveFilters(res.active_filters);
@@ -464,12 +473,27 @@ function App() {
         }
         if (pending.size > 0) schedule();
       },
-      { root: container, threshold: 0.01 },
+      // Rows are virtualized: the grid only mounts the visible window, so a
+      // root of the outer wrapper never intersected anything and rows
+      // scrolled into view were never observed. The viewport is the honest
+      // root here, and a mutation observer picks up rows mounted later.
+      { root: null, threshold: 0.01 },
     );
 
-    container.querySelectorAll("[data-index]").forEach((el) => observer.observe(el));
+    const observed = new WeakSet<Element>();
+    const observeRows = () => {
+      container.querySelectorAll("[data-index]").forEach((el) => {
+        if (observed.has(el)) return;
+        observed.add(el);
+        observer.observe(el);
+      });
+    };
+    observeRows();
+    const mutations = new MutationObserver(observeRows);
+    mutations.observe(container, { childList: true, subtree: true });
 
     return () => {
+      mutations.disconnect();
       observer.disconnect();
       if (timer) clearTimeout(timer);
     };
@@ -771,6 +795,11 @@ function App() {
   const handleKeyDown = useCallback(
     async (e: KeyboardEvent) => {
       if (e.defaultPrevented) return;
+      // An IME is composing a candidate (Chinese, Japanese, Korean). The Enter
+      // that commits the candidate is not "open the selected file", and the
+      // arrows paging the candidate window are not list navigation. Acting on
+      // them opened a random result on every CJK search.
+      if (e.isComposing || e.keyCode === 229) return;
       if (document.body.dataset.ksCapture === "1") return;
       // The setup wizard owns the keyboard while it is open.
       if (isSetupComplete !== true) return;
@@ -781,6 +810,12 @@ function App() {
         !inInput &&
         (document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLTextAreaElement);
       if (inOtherField) return;
+
+      // Rows on screen can still belong to the previous query while the
+      // debounce and the search round trip are in flight. Opening, previewing
+      // or copying one of them acts on a file the user is no longer looking
+      // at, so the result actions below are gated on this.
+      const resultsAreStale = resultsQueryRef.current !== query.trim();
 
       // "/" focuses search when the focus is elsewhere.
       if (e.key === "/" && document.activeElement !== inputRef.current) {
@@ -849,6 +884,14 @@ function App() {
       // Left/Right keep moving the caret while the query is being edited.
       if ((e.key === "ArrowLeft" || e.key === "ArrowRight") && inInput && !navigatingRef.current) return;
 
+      // Tab walks the results only once the user is in the list. Taking every
+      // Tab meant nothing in the interface was reachable without a mouse:
+      // focus could not leave the result list for the toolbar, chips or sort.
+      if (e.key === "Tab") {
+        if (!inInput && !navigatingRef.current) return;
+        if (inInput && e.shiftKey && !navigatingRef.current) return;
+      }
+
       if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "Tab") {
         // Whether the list was already being walked matters for Tab: entering
         // from the search field lands on the first result instead of skipping
@@ -906,9 +949,11 @@ function App() {
           ((e.key === "y" || e.key === "Y") && (e.metaKey || e.ctrlKey)))
       ) {
         // Space after arrowing into results, or Cmd/Ctrl+Y anywhere (Quick Look).
+        if (resultsAreStale) return;
         e.preventDefault();
         setPreview(navList[selectedIndex]);
       } else if (e.key === "Enter" && navList[selectedIndex]) {
+        if (resultsAreStale) return;
         e.preventDefault();
         const target = navList[selectedIndex];
         if (e.shiftKey) {
@@ -924,10 +969,12 @@ function App() {
         (!inInput || inputRef.current!.selectionStart === inputRef.current!.selectionEnd)
       ) {
         // Copy the selected result's path (Cmd/Ctrl+C outside the search box).
+        if (resultsAreStale) return;
         e.preventDefault();
         handleCopyPath(navList[selectedIndex].path);
       } else if ((e.key === "i" || e.key === "I") && (e.metaKey || e.ctrlKey) && navList[selectedIndex]) {
         // Details for the selected result.
+        if (resultsAreStale) return;
         e.preventDefault();
         setDetails(navList[selectedIndex]);
       }
@@ -949,6 +996,8 @@ function App() {
   useEffect(() => {
     const onEsc = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
+      // Escape also cancels an IME candidate; that is not "clear the query".
+      if (e.isComposing || e.keyCode === 229) return;
       if (e.defaultPrevented) return;
       // The setup wizard owns the keyboard (its shortcut capture handles Esc).
       if (isSetupComplete !== true) return;
@@ -989,19 +1038,46 @@ function App() {
 
   // Dismiss like a launcher: hide when the window loses focus (clicking away,
   // switching apps), unless a modal overlay is open. The setup wizard and
-  // native dialogs (folder picker, shortcut capture) also take focus away —
-  // hiding there would destroy the window mid-decision.
+  // native dialogs (folder picker, shortcut capture) also take focus away,
+  // and hiding there would destroy the window mid-decision.
+  //
+  // A blur is only a dismissal when the user moved focus to another
+  // application. Right-click and the OS-rendered popups some controls used to
+  // open also fire blur while the window is still the active one, and hiding
+  // on those made the launcher vanish mid-interaction. Two guards: skip when
+  // the document still reports focus, and skip for a short window after a
+  // pointer press or context menu, which is when a popup would be opening.
   useEffect(() => {
+    // Set on pointerdown / contextmenu. A popup that steals focus opens
+    // within a frame or two of the press, so a short quiet period covers it
+    // while a genuine click-away still hides normally.
+    let lastInteractionAt = Number.NEGATIVE_INFINITY;
+    const markInteraction = () => {
+      lastInteractionAt = Date.now();
+    };
+
     const onBlur = () => {
-      if (isSetupComplete !== true) return;
-      // The config may not have arrived yet on a fresh window; never treat an
-      // app-mode window as a launcher in that gap.
-      if (!config || config.app_mode === "app") return;
-      if (showSettings || showDuplicates || showHelp || preview || details || saveOpen || menu) return;
+      const hide = shouldHideOnBlur({
+        setupComplete: isSetupComplete === true,
+        appMode: config ? (config.app_mode ?? "launcher") : null,
+        overlayOpen: Boolean(
+          showSettings || showDuplicates || showHelp || preview || details || saveOpen || menu,
+        ),
+        documentFocused: document.hasFocus(),
+        msSinceInteraction: Date.now() - lastInteractionAt,
+      });
+      if (!hide) return;
       invoke("hide_window").catch(() => undefined);
     };
+
+    window.addEventListener("pointerdown", markInteraction, true);
+    window.addEventListener("contextmenu", markInteraction, true);
     window.addEventListener("blur", onBlur);
-    return () => window.removeEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("pointerdown", markInteraction, true);
+      window.removeEventListener("contextmenu", markInteraction, true);
+      window.removeEventListener("blur", onBlur);
+    };
   }, [isSetupComplete, showSettings, showDuplicates, showHelp, preview, details, saveOpen, menu, config?.app_mode]);
 
   /* ---------------- render ---------------- */
@@ -1019,6 +1095,7 @@ function App() {
   return (
     <div
       className="relative flex h-screen w-screen select-none flex-col overflow-hidden bg-bg text-fg"
+      onContextMenu={(e) => e.preventDefault()}
     >
       {isSetupComplete === false && (
         <SetupModal

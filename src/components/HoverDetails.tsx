@@ -14,12 +14,22 @@ interface Details {
   height?: number | null;
 }
 
-export function HoverDetails({ result }: { result: SearchResult }) {
+export function HoverDetails({
+  result,
+  active,
+}: {
+  result: SearchResult;
+  /** True once the card has been hovered. Until then nothing is read. */
+  active: boolean;
+}) {
   const { t } = useTranslation("results");
   const { t: tCommon } = useTranslation("common");
   const [details, setDetails] = useState<Details>({});
 
   useEffect(() => {
+    // Dimensions cost an IPC round trip per file, so they are fetched on
+    // hover, as the docstring above promises, not for every mounted card.
+    if (!active || details.width || details.height) return;
     if (result.is_dir) return;
     let cancelled = false;
     invoke<Details>("get_file_details", { path: result.path })
@@ -30,7 +40,7 @@ export function HoverDetails({ result }: { result: SearchResult }) {
     return () => {
       cancelled = true;
     };
-  }, [result.path, result.is_dir]);
+  }, [active, details.width, details.height, result.path, result.is_dir]);
 
   const parts = [
     result.is_dir ? t("hover.folder") : formatBytes(result.file_size),

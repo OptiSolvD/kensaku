@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SearchResult } from "../types";
 import { HighlightedName } from "./EmptyState";
@@ -33,7 +33,9 @@ export const ResultItem = React.memo<ResultItemProps>(
     const { t } = useTranslation("common");
     const imageEligible = Boolean(showThumbs) && !result.is_dir && isThumbImage(result.filename);
     const { src: thumbSrc, failed: thumbFailed } = useThumbnail(result.path, imageEligible);
-    const hasThumb = Boolean(thumbSrc) && !thumbFailed;
+    // Turning thumbnails off must also drop images that were already loaded.
+    const hasThumb = imageEligible && Boolean(thumbSrc) && !thumbFailed;
+    const [hovered, setHovered] = useState(false);
 
     const meta = result.is_dir
       ? `${t("units.folder")} · ${formatRelativeTime(result.modified, t)}`
@@ -44,6 +46,8 @@ export const ResultItem = React.memo<ResultItemProps>(
         type="button"
         onClick={onSelect}
         onDoubleClick={onOpen}
+        onMouseEnter={() => setHovered(true)}
+        onFocus={() => setHovered(true)}
         onContextMenu={(e) => {
           if (!onContextMenu) return;
           e.preventDefault();
@@ -76,7 +80,7 @@ export const ResultItem = React.memo<ResultItemProps>(
           ) : (
             <TypeTile filename={result.filename} isDir={result.is_dir} snippet={result.snippet} query={query} />
           )}
-          <HoverDetails result={result} />
+          <HoverDetails result={result} active={hovered} />
         </span>
 
         <span className="flex min-w-0 flex-col px-0.5 pt-2">

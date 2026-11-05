@@ -420,7 +420,8 @@
     color: var(--fg);
     transition: background-color 120ms var(--ease);
   }
-  .menu-row:hover { background: var(--accent-soft); }
+  .menu-row:hover,
+  .menu-row[data-active="true"] { background: var(--accent-soft); }
 
   /* Text tabs. Selection is weight and color, not a filled pill. */
   .pill {
