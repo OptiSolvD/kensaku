@@ -453,6 +453,21 @@ function GeneralSection({
             }}
           />
         </div>
+        <Field
+          label={t("window.keepRunning")}
+          description={
+            config.app_mode === "app"
+              ? t("window.keepRunningApp")
+              : t("window.keepRunningLauncher")
+          }
+        >
+          <Switch
+            checked={config.close_to_background !== false}
+            onChange={(checked) =>
+              setConfig((c) => (c ? { ...c, close_to_background: checked } : c))
+            }
+          />
+        </Field>
       </Card>
 
       <Card title={t("invocation.title")}>

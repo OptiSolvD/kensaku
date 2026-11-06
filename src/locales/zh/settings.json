@@ -71,12 +71,15 @@
   "window": {
     "title": "窗口",
     "mode": "模式",
-    "description": "窗口模式在关闭时退出 Kensaku。启动器按 Esc 或点击外部时隐藏，常驻托盘。",
+    "description": "启动器模式下按 Esc 或点击外部即隐藏。窗口模式为普通应用窗口。两者都会在关闭后继续在托盘中运行，除非在下方关闭该选项。",
     "app": "窗口",
     "launcher": "启动器",
     "aria": "窗口模式",
-    "appCard": "任务栏或程序坞中的普通窗口。关闭即退出 Kensaku。",
-    "launcherCard": "用快捷键唤起的浮动面板。关闭后隐藏到托盘。"
+    "appCard": "任务栏或 Dock 中的普通窗口。",
+    "launcherCard": "用快捷键唤起的浮动面板。关闭后隐藏到托盘。",
+    "keepRunning": "关闭后继续运行",
+    "keepRunningApp": "关闭窗口后 Kensaku 会留在托盘并保留已加载的索引，重新打开瞬间完成。要彻底退出请使用托盘图标。关闭此选项则关闭即退出。",
+    "keepRunningLauncher": "启动器本就常驻托盘。关闭此选项则关闭窗口即退出。"
   },
   "invocation": {
     "title": "唤起方式",

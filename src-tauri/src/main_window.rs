@@ -58,15 +58,26 @@ fn create(app: &AppHandle) -> tauri::Result<WebviewWindow> {
         .visible(false)
         .build()?;
 
-    // Launcher mode: close hides the window and the app keeps running in the
-    // tray. App mode: close exits the application like a normal desktop app.
-    // Read the mode inside the handler so a Settings change applies without
-    // recreating the window.
+    // Closing the window hides it and keeps the app running in the tray.
+    //
+    // App mode used to call `exit(0)` here, which threw away the loaded
+    // metadata database, full-text index and semantic units, and paid for them
+    // again on the next open. On a large corpus that is several seconds per
+    // open, for a window the user is about to close again. Hiding keeps the
+    // Rust side warm; `hide` destroys the webview and trims memory, so what
+    // stays resident is the index, not a UI.
+    //
+    // Quitting stays explicit: the tray's Quit item, or `close_to_background`
+    // turned off. Both modes now behave the same way, because both are
+    // background-resident apps; the mode only decides what the window looks
+    // like.
+    //
+    // Config is read inside the handler so a Settings change applies to the
+    // live window without recreating it.
     let app_handle = app.clone();
     window.on_window_event(move |event| {
         if let WindowEvent::CloseRequested { api, .. } = event {
-            let app_mode = crate::config::KensakuConfig::load().app_mode;
-            if app_mode == "app" {
+            if !crate::config::KensakuConfig::load().close_to_background {
                 app_handle.exit(0);
                 return;
             }

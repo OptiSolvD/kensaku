@@ -71,12 +71,15 @@
   "window": {
     "title": "Window",
     "mode": "Mode",
-    "description": "Window mode quits on close. Launcher hides on Esc or click outside, and keeps running in the tray.",
+    "description": "Launcher hides on Esc or click outside. Window mode is a normal app window. Both keep running in the tray unless you change it below.",
     "app": "Window",
     "launcher": "Launcher",
     "aria": "Window mode",
-    "appCard": "Normal window in the taskbar or Dock. Closing quits Kensaku.",
-    "launcherCard": "Floating palette summoned by a shortcut. Closing hides it to the tray."
+    "appCard": "Normal window in the taskbar or Dock.",
+    "launcherCard": "Floating palette summoned by a shortcut. Closing hides it to the tray.",
+    "keepRunning": "Keep running when closed",
+    "keepRunningApp": "Closing the window puts Kensaku in the tray and keeps the index loaded, so reopening is instant. Quit from the tray icon. Turn this off to make closing quit.",
+    "keepRunningLauncher": "The launcher already stays in the tray. Turn this off to quit when the window closes."
   },
   "invocation": {
     "title": "Invocation",

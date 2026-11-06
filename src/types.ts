@@ -181,6 +181,8 @@ export interface KensakuConfig {
   ocr_languages?: string[];
   ocr_engine?: OcrEngine;
   app_mode?: "launcher" | "app";
+  /** Closing the window hides to the tray instead of quitting. */
+  close_to_background?: boolean;
   theme?: "light" | "dark";
   language?: string | null;
   aliases?: Alias[];

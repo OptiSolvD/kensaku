@@ -141,6 +141,19 @@ pub struct KensakuConfig {
     /// tiny footprint) or `app` (stays open, appears in the dock/taskbar).
     #[serde(default = "default_app_mode")]
     pub app_mode: String,
+    /// Closing the window keeps the app running in the tray instead of
+    /// quitting, so reopening is instant.
+    ///
+    /// Startup is the expensive part: the metadata database, the full-text
+    /// index and the semantic units all have to be loaded before the first
+    /// query can run. Quitting on close threw that away and paid for it again
+    /// on every open, which on a hundred thousand files is several seconds.
+    /// Staying resident keeps the Rust side warm while the webview is
+    /// destroyed on close, so the idle footprint is the index, not the UI.
+    ///
+    /// Quitting is explicit: the tray menu's Quit item, or turning this off.
+    #[serde(default = "default_true")]
+    pub close_to_background: bool,
     /// OCR backend: `tesseract` (fast default), `accurate` (optional
     /// PP-OCRv6 pack) or `indra` (optional Indra OCR pack). Indra falls back
     /// to PP-OCR, PP-OCR to Tesseract, when a pack is absent.
@@ -460,6 +473,7 @@ impl Default for KensakuConfig {
             ocr_languages: Vec::new(),
             ocr_engine: default_ocr_engine(),
             app_mode: default_app_mode(),
+            close_to_background: true,
             theme: default_theme(),
             language: None,
             aliases: default_aliases(),
@@ -779,6 +793,31 @@ mod tests {
         let json_without_flag = json.replace("\"auto_update\":false,", "");
         let loaded_defaulted = KensakuConfig::load_from_str(&json_without_flag);
         assert!(loaded_defaulted.auto_update);
+    }
+
+    #[test]
+    fn closing_keeps_the_app_running_by_default() {
+        // The default matters more than the setting: a corpus this large takes
+        // seconds to load, and quitting on close paid that cost on every open.
+        // An existing config file written before this field must also get the
+        // default, or the fix silently does not apply to anyone upgrading.
+        let cfg = KensakuConfig::default();
+        assert!(
+            cfg.close_to_background,
+            "closing the window must keep the app running by default"
+        );
+
+        let json = serde_json::to_string(&cfg).unwrap();
+        let without = json.replace("\"close_to_background\":true,", "");
+        assert!(
+            !without.contains("close_to_background"),
+            "test setup failed to remove the field"
+        );
+        let loaded = KensakuConfig::load_from_str(&without);
+        assert!(
+            loaded.close_to_background,
+            "a config without the field must default to running in the background"
+        );
     }
 
     #[test]
