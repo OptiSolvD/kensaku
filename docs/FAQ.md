@@ -14,15 +14,16 @@ opening the main window, showing live counts and ending with a Done summary;
 later launches stay search-first and instant.
 
 **What happens during setup?**
-The guided flow covers folders, exclusions, preferences (theme + shortcut),
-optional OCR/model downloads, and the first scan, ending with a Done summary
-before the main window opens. Downloads are acquired there; Settings shows
-installed status and **About → Run setup again**.
+The guided flow covers folders, exclusions, preferences (theme, interface
+language, window mode, shortcut), optional OCR/model downloads, and the first
+scan, ending with a Done summary before the main window opens. Downloads are
+acquired there; Settings shows installed status and **About → Run setup again**.
 
 **Why does search return nothing for a word I know is in a file?**
 Check: is the folder watched? Is the extension in the excluded list? Is the file
-over the content cap (1 MB indexed, 20 MB extraction ceiling)? Is it binary? Run
-Settings → Doctor. The Search syntax card shows filters that may be active.
+over the content cap (extraction up to 100 MB, 4 MB of text indexed)? Is it
+binary? Run Settings → Health → Doctor. The Search syntax card shows filters
+that may be active.
 
 **Does it index hidden files?**
 No by default. `skip_hidden` is on; you can opt in via config.
@@ -32,14 +33,16 @@ Yes — PDF, DOCX/PPTX/XLSX, EPUB/ODT, RTF. Scanned PDFs need OCR; encrypted PDF
 flagged, not indexed.
 
 **Does it search images?**
-By filename, and by OCR text: PP-OCRv6 by default (runs inside Kensaku, ~0.15 s
-a page), or the optional higher-quality Indra engine (~27 MB pack, deskew and
-multi-script recognition), or Tesseract where neither can run (Intel Macs) or
-if you pick it.
-Scanned PDFs are OCR'd too. Also by perceptual near-duplicate. Natural-language visual search ("red cap",
-"system design diagram"), similar-image lookup, and an
-optional local "this is me" identity are not part of 1.0.
-Semantic image search (CLIP) is not implemented yet.
+By filename, and by OCR text: PP-OCRv6 by default (runs inside Kensaku on a
+bundled ONNX Runtime), or the optional higher-quality Indra engine (~27 MB pack,
+deskew and multi-script recognition), or Tesseract where neither can run (Intel
+Macs) or if you pick it. Scanned PDFs are OCR'd too, one page at a time. Results
+also group perceptual near-duplicates.
+
+Natural-language visual search ("red cap", "system design diagram"),
+similar-image lookup, and an optional local "this is me" identity are **not**
+part of the 1.0 search path. The Beta section can download a CLIP pack, but no
+production visual encoder is wired in, so `similar_images` self-hides.
 
 **Can I just type "latest resume" or use `/` and `@`?**
 Yes. A deterministic, local intent compiler turns recency, size, type, and place
@@ -61,45 +64,58 @@ Yes. Add each root in Settings → Folders. Unplugged drives are preserved rathe
 than pruned.
 
 **How much memory does it use?**
-The metadata layer keeps roughly 128 bytes per file entry (≈12 MB per 100k
-files), plus a path index and the ~30 MB static embedding table when the semantic
-pack is installed. The crawl is bounded: extracted text is written through a
-small queue instead of accumulating in memory, perceptual image hashing runs in a
-separate background pass that decodes one image at a time, and the Tantivy writer
-arena is 16 MB. On the development machine the indexer process peaked at roughly
-72–73 MB for both text-only and mixed image/text corpora (before adding the
-~30 MB embedding table). Total app memory is dominated by the OS webview that
-hosts the desktop window.
+The metadata layer keeps 128 bytes per `FileEntry` (12.2 MB measured for 100,201
+entries), plus a path index and the ~7.3 MiB i8 static embedding table when the
+semantic pack is installed (the f32 switch is ~30 MB). The crawl is bounded:
+extracted text is written through a small queue instead of accumulating in
+memory, perceptual image hashing runs in a separate background pass that decodes
+one image at a time, and the Tantivy writer arena is 16 MB. On the development
+machine the indexer process peaked at roughly 72–73 MB for both text-only and
+mixed image/text corpora (before adding the embedding table). Total app memory
+is dominated by the OS webview that hosts the desktop window.
 
 **Does it conflict with Spotlight / Everything / Recoll?**
 No. It builds its own index and does not read or write theirs.
 
 **Can two instances run?**
-No — a file lock makes a second launch exit cleanly.
+No. A GUI lock makes a second launch hand its request to the running app and
+exit; the first window is shown (or toggled) instead of a second copy starting.
 
 **Is the app signed?**
 Not yet. macOS needs right-click → Open (or `xattr -dr com.apple.quarantine`),
 Windows shows SmartScreen. See [`INSTALL.md`](INSTALL.md#the-builds-are-unsigned).
 
+**Does it update itself?**
+Yes. Background checks run about every 12 hours (`auto_update`, on by default).
+Settings → About shows release notes, asset size, and download progress; the
+download is size-checked and verified against the release `SHA256SUMS` before
+the installer runs. Portable installs are told to replace the folder instead.
+You can turn checks off in Settings → About.
+
 **Where is my data?**
 `~/.config/kensaku/` on Linux, `~/Library/Application Support/kensaku/` on macOS,
-`%APPDATA%\kensaku\` on Windows. Settings → About → Reset everything wipes it.
+`%APPDATA%\kensaku\` on Windows. Settings → About → Reset everything wipes the
+index, database, and settings; downloaded model and OCR packs are kept unless you
+tick the box to remove them.
 
 **Can I use it from an AI agent?**
 Yes — that's the point of `kensaku-cli` and the MCP server. See
 [`AGENTS.md`](AGENTS.md). The app itself contains no LLM.
 
 **Why not bundle an LLM / "ask my files"?**
-A local LLM is a multi-gigabyte dependency and a different product. Kensaku stays
-the fast, trustworthy index by default. An **optional** local Ollama/LM Studio
-connection may compile plain-language intent and power `/ask` with path
-citations; agents bring their own model through MCP. No model is bundled, and
-file contents never leave the machine unless you explicitly configure a cloud
-provider — Kensaku is local-first by design.
+A local LLM is a multi-gigabyte dependency and a different product. Kensaku is
+the fast, trustworthy index: plain-language intent is compiled deterministically
+on-device, and there is no chat panel and no `/ask` command. Agents bring their
+own model through MCP and get the same read-only index. File contents never leave
+the machine during search.
 
 **How do I contribute?**
 See [`CONTRIBUTING.md`](CONTRIBUTING.md). Tests and clippy must pass.
 
-**Why is the binary not 18 MB like the early plan?**
-That plan assumed static ONNX inside the app. The shipped base uses a bundled
-static embedding table instead, keeping the app small; the neural tier is optional.
+**Why is the app bigger than the early 18 MB plan?**
+The early plan assumed a much smaller dependency set and no bundled ONNX Runtime.
+The 1.0.16 Windows x64 downloads are a 14.3 MB NSIS setup and a 20.1 MB MSI;
+the installed app binary is about 36 MB. The base search path uses the compact
+i8 static table rather than
+a neural graph at query time; ONNX is present for OCR, and the smart embedding
+tier remains optional.

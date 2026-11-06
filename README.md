@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  Search 100,000 file names in about a millisecond, using roughly 12 MB of memory.<br/>
+  Search 100,000 file names in milliseconds, with about 12 MB of metadata.<br/>
   Search inside documents, images, and code too. Nothing leaves your machine.
 </p>
 
@@ -30,7 +30,7 @@
   <a href="#features">Features</a> ·
   <a href="#performance">Performance</a> ·
   <a href="#connect-ai-agents-mcp">MCP</a> ·
-  <a href="docs/USAGE.md">Docs</a> ·
+  <a href="docs/README.md">Docs</a> ·
   <a href="docs/LANGUAGES.md">Languages</a> ·
   <a href="#contributing">Contribute</a>
 </p>
@@ -60,7 +60,7 @@ Filename tools are everywhere. Reading *inside* your files — locally, instantl
 | Filename search, milliseconds | ✅ | ✅ | ✅ | ✅ |
 | Full text inside PDF/DOCX/EPUB… | ✅ | ❌ | ❌ | ❌ |
 | Text inside screenshots & images (OCR) | ✅ | ❌ | ❌ | ❌ |
-| Multilingual & CJK text (50+ formats) | ✅ | ❌ | ❌ | ❌ |
+| Multilingual & CJK text (auto-tokenized) | ✅ | ❌ | ❌ | ❌ |
 | Find by meaning ("the PDF about indexing") | ✅ | ❌ | ❌ | ❌ |
 | Natural-language time ("screenshots from last week") | ✅ | ❌ | partial | ❌ |
 | Your AI agents can search it (MCP) | ✅ | ❌ | ❌ | ❌ |
@@ -78,16 +78,18 @@ Filename tools are everywhere. Reading *inside* your files — locally, instantl
 ## Features
 
 **Fast**
-- Filename search across ~100,000 files in a few milliseconds on a warm cache. Method and numbers are in [Performance](#performance).
+- Filename search across ~100,000 files in milliseconds on a warm cache. Method, hardware, and per-platform numbers are in [Performance](#performance).
 - Results update as you type. There is no separate search page.
 - Incremental indexing: changed files are picked up without rescanning the whole disk.
+- Closing the window keeps the index warm; reopening is instant.
 
 **Finds more**
 - Names, full text, fuzzy matches that tolerate typos, and meaning, in one search.
-- **Documents & Office**: PDF, DOCX, PPTX, XLSX, EPUB, ODT/ODS/ODP, RTF, and plain text.
+- **Documents & Office**: PDF, DOCX, PPTX, XLSX, EPUB, ODT/ODS/ODP, RTF, CSV/TSV, and plain text.
 - **Multilingual & CJK by default**: Custom unigram + bigram tokenizer for Chinese (Hanzi/Bopomofo), Japanese (Kanji/Kana), and Korean (Hangul), plus mixed-script boundary handling. Detailed breakdown in [docs/LANGUAGES.md](docs/LANGUAGES.md).
 - **50+ Code & Data Formats**: Rust, Python, TypeScript, Go, C/C++, Java, Shell, SQL, JSON, YAML, TOML, Dockerfile, and more.
-- **Images & OCR**: Text is read with PP-OCRv6 by default (no install needed). Higher-quality Indra engine (deskew, multi-script Latin/CJK/RTL/World recognition, ~27 MB pack) and classic Tesseract are selectable in Setup/Settings.
+- **Images & OCR**: Text is read with PP-OCRv6 by default (bundled runtime; the ~6.1 MB model pack downloads once). Higher-quality Indra engine (deskew, multi-script Latin/CJK/RTL/World recognition, ~27 MB pack) and classic Tesseract are selectable in Setup/Settings.
+- **Content depth you can tune**: up to 100 MB per file, 4 MB of text, and 48 semantic chunks by default; `quick` / `balanced` / `deep` presets.
 
 **Precise**
 - Filters and sort: Best match, Newest, Oldest, Largest, Name.
@@ -95,12 +97,13 @@ Filename tools are everywhere. Reading *inside* your files — locally, instantl
 - A query language when you want it (below).
 
 **A real launcher**
-- Starts hidden in the tray and summons with a keystroke. Recents are ranked by what you actually opened, and they survive restarts.
-- Or switch to **Desktop app** mode: a normal taskbar window that stays open and quits on close. Setup defaults to this; the launcher is one click away in Settings.
-- Space previews (Quick Look) for PDFs, images, and text. Grid or list layout. Full keyboard navigation.
+- Starts in the tray and summons with a keystroke. Recents are ranked by what you actually opened, and they survive restarts.
+- Or switch to **Desktop app** mode: a normal taskbar window. Launcher is the setup default; the desktop app is one click away in Setup or Settings.
+- Space previews (Quick Look) for PDFs, images, and text. Grid or list layout. Full keyboard navigation. `Cmd/Ctrl+Shift+L` toggles the layout.
 
 **Works with AI agents**
 - Compatible agents can search the same local index over MCP. Read-only by default. See [Connect AI agents](#connect-ai-agents-mcp).
+- Also: `find_symbol` for tree-sitter definitions, bounded regex search, scoped roots, and cursor pagination.
 
 **Private**
 - No account, no telemetry, no cloud search. Your index stays in your OS config directory.
@@ -133,12 +136,14 @@ Download the bundle for your system from the [latest release](https://github.com
 
 | Platform | Download |
 |---|---|
-| Windows (Intel/AMD) | `Kensaku_<version>_x64-setup.exe` or `.msi` |
-| Windows (ARM, Snapdragon) | `Kensaku_<version>_arm64-setup.exe` or `.msi` |
-| macOS (Apple silicon and Intel) | `Kensaku_<version>_universal.dmg` |
-| Linux | `.AppImage`, `.deb`, or `.rpm` |
+| Windows (Intel/AMD) | `kensaku_<version>_x64-setup.exe` or `kensaku_<version>_x64_en-US.msi` |
+| Windows (ARM, Snapdragon) | `kensaku_<version>_arm64-setup.exe` or `kensaku_<version>_arm64_en-US.msi` |
+| Windows portable | `kensaku-portable-<version>-x64.zip` (or `-arm64.zip`) |
+| macOS (Apple silicon and Intel) | `kensaku_<version>_universal.dmg` |
+| Linux | `kensaku_<version>_amd64.AppImage`, `.deb`, or `.rpm` |
+| Agent CLI | `kensaku-cli-{linux,macos,windows}-*` |
 
-Every release also ships `kensaku-cli` for the command line and a `SHA256SUMS` file so you can verify what you downloaded.
+Every release also ships `SHA256SUMS` so you can verify what you downloaded. The 1.0.16 Windows x64 downloads are a **14.3 MB** NSIS setup and a **20.1 MB** MSI; the installed app binary is about **36 MB**.
 
 Builds are not yet code-signed, so macOS and Windows show a warning the first time. That is expected for an independent app, not a sign of a problem.
 
@@ -147,7 +152,7 @@ Builds are not yet code-signed, so macOS and Windows show a warning the first ti
 
 [docs/INSTALL.md](docs/INSTALL.md) has the full steps.
 
-**First run:** choose the folders you want indexed, pick exclusions, and optionally download the OCR or model packs. Search works while the first scan runs.
+**First run:** choose the folders you want indexed, pick exclusions, choose launcher or desktop mode, and optionally download the OCR or model packs. Search works while the first scan runs. Closing the window keeps Kensaku running in the tray; quit from the tray.
 
 **Command line:** `kensaku-cli` ships with each release.
 
@@ -156,6 +161,8 @@ kensaku-cli search "docker error"
 kensaku-cli search "invoice" --ext pdf --since 30d
 kensaku-cli search "resume" --json
 kensaku-cli state
+kensaku-cli mcp
+kensaku-cli serve --port 8765
 ```
 
 ### Build from source
@@ -187,16 +194,25 @@ Responses are budgeted in size, and file content is returned as data, never as i
 
 ## Performance
 
-Speed is the point of Kensaku. Every number below was measured on a release build on Linux (8 vCPU, SSD) against a 100,000-file folder, and the harnesses are in [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
+Speed is the point of Kensaku. Every number below was measured; the full method, corpus, hardware, and caveats are in [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
 
 | What | Result |
 |---|---|
-| Name search, in memory (avg of 8 queries) | **1.3 ms** (best 0.5 ms, worst 2.4 ms) |
-| Index 101,101 files, first run | 184 s, peak 183 MB |
-| Re-index with nothing changed | **0.56 s** |
-| Memory for file names and metadata, 100k files | ~12 MB |
+| Name search, 100k files (Windows 11, 1.0.16, default threads) | **18 ms average** (best 8.3 ms) |
+| Name search, 100k files (Windows 11, 4 threads) | **3.1 ms average** |
+| Name search, 100k files (Linux reference, warm) | **1.3 ms average** (best 0.5 ms) |
+| Metadata for 100k files | **12.2 MB** (128 B per entry) |
+| First run over 101k mixed files (earlier Linux reference) | 184 s, peak 183 MB |
+| Re-index with nothing changed (same corpus) | 0.56 s |
 
-Same folder, same machine, filename search, cold process each run:
+The Windows and Linux rows are the same workload on different machines, not a
+regression: Windows NTFS metadata reads and antivirus make the walk much slower,
+and a 16-thread rayon pool adds scheduling overhead to a scan that the
+char-bloom prefilter already makes cheap. On the same 100k corpus, 4–8 threads
+average 3–5 ms. The Linux number is the historical warm-cache reference. Neither
+is a cross-platform "fastest" claim.
+
+Same folder class, filename search, cold process each run (Linux reference):
 
 | Tool | "invoice" | "deploy_error" |
 |---|---|---|
@@ -204,11 +220,25 @@ Same folder, same machine, filename search, cold process each run:
 | plocate | 34 ms | 6 ms |
 | fd | 109 ms | 98 ms |
 
-The two rows aren't a perfect match: Kensaku's search is fuzzy and runs inside a running app, while plocate and fd start a new program for each search. Spotlight, Everything, and Listary haven't been measured yet, and these numbers come from Linux, not macOS or Windows.
+The two rows aren't a perfect match: Kensaku's search is fuzzy and runs inside a running app, while plocate and fd start a new program for each search. Spotlight, Everything, and Listary haven't been measured, and these numbers come from Linux, not macOS or Windows.
 
-**On Windows (1.0.6, release build, Windows 11):** the installer is **9 MB**, and with a 24,500-file index loaded the app idles in the tray at **about 20 MB of private memory** — roughly 150 MB while you're actively browsing results. It trims back down the moment you hide it.
+**Memory.** The in-memory metadata layer is 128 bytes per `FileEntry`: 12.2 MB for 100,201 entries. The index itself, Tantivy, and the optional embedding table are separate. On Windows, closing the window destroys the webview and keeps the Rust index warm, so the idle footprint is the index rather than a full UI.
 
 Indexing is a single pass: each file is read once and feeds both the name and text indexes. Work is queued in bounded batches, so memory stays flat on large folders.
+
+## What's new in 1.0.16
+
+- **Launcher fix:** right-click and the sort control no longer make the launcher hide itself; the context menu is suppressed and sort is an in-app listbox.
+- **Clean installs no longer report a crash** on startup; milestones go to `kensaku.log` and only real failures reach the crash log.
+- **Windows portable OCR works** — `onnxruntime.dll` now ships in the zip and the build fails if it is missing.
+- **Tesseract reads the languages you have** — `-l` is passed, and Settings → Search has a language picker.
+- **Folder renames and unreadable folders are handled correctly** instead of leaving stale documents or deleting a subtree.
+- **`.gitignore` / `.cursorignore` are honored by the watcher**, not just the crawl.
+- **Indexing recovers from a panic**, excluded extensions are removed from the existing index, and files over 1 MB honor the deep-content setting.
+- **Updates are bounded and verified**: timeout, expected size, and `SHA256SUMS` check before install; truncated downloads are rejected.
+- **MCP `read_snippet` can no longer read arbitrary files** outside the index; credential files and excluded extensions are refused.
+- **IME Enter no longer opens files**, Tab no longer traps focus, and actions no longer apply to the previous query's rows.
+- Frontend unit tests (`vitest`) and an indexing progress bar in Settings.
 
 ## Privacy and security
 
@@ -222,10 +252,10 @@ Full threat model: [SECURITY.md](SECURITY.md).
 
 ## Status
 
-**Shipping now (1.0.15)**
+**Shipping now (1.0.16)**
 
 - Desktop app for Windows, macOS, and Linux: light and dark themes, grid and list results, infinite scroll, thumbnails, hover details, right-click actions
-- Two window modes: a normal desktop app (setup default) or a tray launcher with a global summon keystroke and memory trimmed while hidden
+- Two window modes: a tray launcher with a global summon keystroke (setup default) or a normal desktop app; closing either keeps the index warm
 - English and Simplified Chinese interface, auto-detected from the system or chosen in Settings
 - Recents ranked by what you actually opened, persisted across restarts
 - Search by name, content, meaning, and typo-tolerant matches
@@ -233,13 +263,12 @@ Full threat model: [SECURITY.md](SECURITY.md).
 - Incremental indexing that tracks renames and deletes
 - Agent access over MCP and loopback HTTP, with one-click setup for Claude and Cursor
 - `.gitignore` and `.cursorignore` respected by default
+- In-app updates: background checks, release notes, progress, size + checksum verification, and one-click install
 
 **Known limitations**
 
-- Builds are not yet code-signed; in-app updating is fully supported with 1-click install and configurable background checks.
-- OCR: PP-OCRv6 by default (bundled runtime, ~6 MB model pack downloaded on first run); optional Indra engine with
-  deskew and multi-script recognition (~27 MB pack, downloaded on demand). Intel Macs fall back to Tesseract.
-  JPEG 2000, fax and JBIG2 scans are not decoded yet.
+- Builds are not yet code-signed. In-app updating works, but macOS and Windows still warn on first install.
+- OCR: PP-OCRv6 by default (bundled runtime, ~6.1 MB model pack); optional Indra engine with deskew and multi-script recognition (~27 MB pack). Intel Macs fall back to Tesseract. JPEG 2000, fax, and JBIG2 scans are not decoded yet.
 - Thumbnails cover image files only. Documents and code show type icons.
 - Visual search is a beta model download and is not part of search results yet.
 - Windows gets the most real-world testing today. macOS and Linux builds ship from CI and would benefit from more hands on them — see below.
@@ -251,8 +280,8 @@ Kensaku is actively built, and the roadmap bends toward what people ask for. Som
 - **A glass theme — and more customization.** A translucent, vibrancy-style finish, with adjustable density, accents, and per-surface control. The current light/dark pair is the floor, not the ceiling. → [vote & discuss](https://github.com/yjid/kensaku/discussions/36)
 - **App search and launch.** Type "term", open Terminal. Installed applications join the same instant index, so the launcher stops where your files end and your tools begin. → [vote & discuss](https://github.com/yjid/kensaku/discussions/37)
 - **Internet quick search.** For the things your files can't answer — opt-in, off by default, clearly separated from local results so the local-first promise stays intact. → [vote & discuss](https://github.com/yjid/kensaku/discussions/38)
-- **Ask your files questions.** An answers layer on top of the index: "what was the design retainer?" answered from your own documents. Local-first by default, cloud models only if you opt in with a key. → [vote & discuss](https://github.com/yjid/kensaku/discussions/39)
-- **Auto-updater & in-app updates.** A "check for updates" button is in the app now; a signed auto-updater is the real answer and needs signing + infra first. → [vote & discuss](https://github.com/yjid/kensaku/discussions/40)
+- **Signed builds and notarization.** In-app updates ship now; a paid signing identity is the missing piece for a warning-free first install. → [vote & discuss](https://github.com/yjid/kensaku/discussions/40)
+- **Visual and related-file agents.** Text-to-image and similar-image lookup once a real visual encoder is wired into search; `find_related` for same-stem/import/neighbour lookups. → [vote & discuss](https://github.com/yjid/kensaku/discussions/39)
 
 None of this ships on a promise — it ships in the order the community pushes. **You tell us:** open a [discussion](https://github.com/yjid/kensaku/discussions) with your use case, or upvote an existing idea in the [issue tracker](https://github.com/yjid/kensaku/issues). The loudest real-world need gets the next slot.
 
@@ -265,7 +294,7 @@ Kensaku is young, MIT-licensed, and built by people who wanted a better launcher
 - **Good first issues.** Check the [issue tracker](https://github.com/yjid/kensaku/issues) for tasks scoped for a first contribution.
 - **Search quality.** Ranking, typo tolerance, and new extractors ([docs/EXTRACTORS.md](docs/EXTRACTORS.md) shows how to add one).
 - **Agents and integrations.** MCP tooling and guides ([docs/AGENTS.md](docs/AGENTS.md)).
-- **Docs, translations, and screenshots.** [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) has the setup: `bun install`, `make dev`, `make test` (240+ Rust tests run on every push).
+- **Docs, translations, and screenshots.** [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) has the setup: `bun install`, `make dev`, `make test` (500+ Rust tests plus the frontend vitest suite run on every push).
 - **Security.** Please report vulnerabilities privately via [SECURITY.md](SECURITY.md).
 
 If Kensaku saves you ten minutes, [star the repository](https://github.com/yjid/kensaku/stargazers) — it's the only marketing an independent app has, and it's how the next contributor finds us.

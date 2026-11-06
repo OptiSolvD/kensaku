@@ -9,11 +9,12 @@ assets explicit.
 ```bash
 git checkout master && git pull
 # bump the version in package.json, src-tauri/Cargo.toml, src-tauri/tauri.conf.json
+# and src-tauri/Cargo.lock; bump cli/Cargo.toml + cli/Cargo.lock when the CLI changes
 # update CHANGELOG.md
 bun install
 cargo test --all-targets --manifest-path src-tauri/Cargo.toml
 cargo clippy --all-targets --manifest-path src-tauri/Cargo.toml -- -D warnings
-npx tsc --noEmit && bun run build
+npx tsc --noEmit && bun run test && bun run build
 git add -A && git commit -m "chore(release): vX.Y.Z"
 git push origin master
 ```
@@ -32,8 +33,8 @@ gh run watch   # or: gh run list --workflow=release.yml
 |---|---|
 | `kensaku-linux` | `.deb`, `.rpm`, `.AppImage` |
 | `kensaku-macos` | universal `.dmg` / `.app` |
-| `kensaku-windows` | `.msi`, NSIS `.exe` |
-| `kensaku-cli-{linux,macos,windows}` | `kensaku-cli` binary |
+| `kensaku-windows` | `.msi`, NSIS `.exe`, portable `.zip` (x64 + ARM64) |
+| `kensaku-cli-{linux,macos,windows}` | `kensaku-cli` binary (including Windows ARM64) |
 
 Builds are **unsigned**. See `INSTALL.md` for the user-facing consequences.
 

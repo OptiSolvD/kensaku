@@ -1,17 +1,19 @@
 # Kensaku for AI agents
 
 Kensaku exposes its index to external agents. It is **read-only by default,
-local-only, and shares the same index as the desktop app** — no API keys, no
-network. An opt-in `reindex` tool is the only write action.
+local-only, and shares the same index as the desktop app** — no API keys and no
+outbound network. An opt-in `reindex` tool is the only write action.
 
 Two surfaces, one binary:
 
 - **MCP** over stdio — for Claude Code, Cursor, and any MCP client.
 - **CLI** — for shell-capable agents and one-off queries.
 
-Both use the existing `~/.config/kensaku` index. The MCP server pings the
-daemon and forwards searches/state to it when available; with no daemon it
-opens the index read-only and loads metadata/vectors once per session.
+Both use the same index as the desktop app: `~/.config/kensaku` on Linux,
+`%APPDATA%\kensaku` on Windows, and `~/Library/Application Support/kensaku` on
+macOS. The MCP server pings the daemon and forwards searches/state to it when
+available; with no daemon it opens the index read-only and loads
+metadata/vectors once per session.
 
 ---
 
@@ -69,7 +71,7 @@ Returns JSON in `content[0].text`:
   "page_size": 10,
   "next_cursor": "k1-a",
   "has_more": true,
-  "token_budget": 5000,
+  "token_budget": 1500,
   "as_of": 1761400000
 }
 ```
@@ -85,7 +87,8 @@ at the cap reports `cursor_limit_reached: true` instead of materialising more.
 { "path": "/abs/file.rs", "query": "timeout", "max_tokens": 256 }
 ```
 
-Returns `{ path, line_start, line_end, text, truncated }`. Text is capped at
+`max_tokens` is 32–1024 (default 256). Returns `{ path, line_start,
+line_end, text, truncated, token_budget }`. Text is capped at
 `max_tokens × 4` characters and centered on the first match. Never returns a
 whole large file.
 
@@ -138,7 +141,8 @@ kensaku-cli mcp
 ```
 
 Default output is `path<TAB>score<TAB>snippet`; `--json` prints the full
-response. Exit codes: `0` ok, `2` usage, `3` no index (launch Kensaku once).
+response. Exit codes: `0` ok, `1` runtime failure, `2` usage, `3` no index
+(launch Kensaku once).
 
 ---
 
@@ -157,12 +161,16 @@ response. Exit codes: `0` ok, `2` usage, `3` no index (launch Kensaku once).
 
 ---
 
-## Also shipped (agent surface v2)
+## Other shipped tools and limits
 
 - **`find_symbol`** — tree-sitter definitions (Rust, Python, JavaScript,
   TypeScript): `{ query, language?, path?, page_size≤50 }` → path, kind, line
   range, one-line signature. Candidates come from the content index; up to
   200 files are parsed per call.
+- **`similar_images`** — similar-image lookup by indexed image path:
+  `{ path, limit≤50 }`. It is listed only when a real visual encoder exists.
+  In shipped builds `active_encoder()` is `None`, so the tool self-hides and
+  the visual tier is not part of search.
 - **Keyset pagination past the 10k cap** — exhaustive cursors `k2-<hex path>`
   return matches strictly after the last path; `total` is then a windowed
   lower bound (`total_is_lower_bound: true`). Offset cursors (`k1-`) still
@@ -184,19 +192,13 @@ response. Exit codes: `0` ok, `2` usage, `3` no index (launch Kensaku once).
   HTTP on `POST /mcp` (JSON or SSE), read-only `GET /health`, `GET /search?q=`,
   and an SSE keepalive at `GET /events`. Bearer token in
   `<config>/http.token` (0600); loopback bind + per-connection peer check;
-  `reindex` is never enabled on this transport. `/ask` is a CLI/GUI feature,
-  not an HTTP route.
-- **Optional local LLM** — query compiler (validated chips) and `/ask` with
-  path+line citations. Off by default; the model never retrieves on its own
-  and is never required. CLI: `kensaku-cli ask "<question>"`. The compiler
-  validates both filter keys and values against the query grammar, so chips
-  that would do nothing are rejected rather than shown.
+  `reindex` is never enabled on this transport. There is no `/ask` route and no
+  chat endpoint; Kensaku does not bundle or call an LLM.
 
 ## Planned
 
 - **`find_related`** — related-file lookups (same stem, imports, neighbors).
-- **Visual agent tools** — text-to-image and similar-image lookups once the
-  vision tier is wired into search; `similar_images` exists and self-hides
-  until then. Read-only and local like everything else.
+- **Visual agent tools** — text-to-image and similar-image lookups once a real
+  visual encoder is wired into search. Read-only and local like everything else.
 
-Technical shape: [ARCHITECTURE.md](ARCHITECTURE.md) §18.
+Technical shape: [ARCHITECTURE.md](ARCHITECTURE.md) §8.

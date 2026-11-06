@@ -1,8 +1,13 @@
-# Kensaku launch kit (1.0.7)
+# Kensaku launch kit (1.0.16)
 
 Everything needed to announce the app. Tone rules: concrete over adjectives,
 honest limits included, every post ends with a question or an ask for feedback.
 Never crosspost the same day to overlapping audiences.
+
+> Updated for 1.0.16. Re-read the numbers against
+> [docs/BENCHMARKS.md](../docs/BENCHMARKS.md) before posting: the Windows and
+> Linux figures are different machines, and the thread count changes the
+> filename-search result.
 
 ---
 
@@ -31,7 +36,8 @@ screenshots. It also finds by meaning: "the PDF about database indexing"
 locates notes-final-2.pdf. And it parses "screenshots from last week".
 
   • 100% local. No account, no telemetry, nothing to the cloud.
-  • Alt+Space to summon. ~20 MB of RAM idling in the tray. 9 MB installer.
+  • Alt+Space to summon. ~12 MB of metadata for 100,000 files; the 1.0.16
+    Windows setup is 14.3 MB.
   • Free and open source, MIT: github.com/yjid/kensaku
   • Bonus: Claude or Cursor can search the same index over MCP, read-only.
 
@@ -48,7 +54,7 @@ Same body, plus this line before the final question:
 
 ```
 License: MIT. Stack: Rust + Tauri, SQLite (WAL) as durable truth, Tantivy
-for full text, model2vec static embeddings for semantic search. Docs live
+for full text, a static embedding table for semantic search. Docs live
 in /docs — ARCHITECTURE.md is the honest map. Extractors are a documented
 extension point (docs/EXTRACTORS.md) if you want to teach it a new format.
 ```
@@ -60,12 +66,14 @@ extension point (docs/EXTRACTORS.md) if you want to teach it a new format.
 ### Per-sub first comment (post it yourself immediately after submitting)
 
 - r/SideProject: "The single most requested thing so far was 'search my
-  screenshots' — OCR runs with PP-OCRv6 by default (bundled, no install), and the
-  optional Indra engine handles handwriting-ish and low-quality captures."
+  screenshots' — OCR runs with PP-OCRv6 by default (bundled runtime; the
+  ~6.1 MB model pack downloads once), and the optional Indra engine handles
+  handwriting-ish and low-quality captures."
 - r/productivity: "The workflow trick: don't organize. Search 'invoice
   modified:30d' beats the folder you were going to create."
 - r/windowsapps: "Alt+Space is the default summon (rebindable in Settings).
-  It starts hidden in the tray and trims to ~20 MB while idle."
+  It starts hidden in the tray; closing the window destroys the webview and
+  keeps the index warm instead of rebuilding it."
 - r/opensource: "Good first issues are labeled in the tracker; extractors
   and agent tooling are the two areas where outside PRs land fastest."
 
@@ -83,19 +91,21 @@ Show HN: Kensaku – local file search that reads inside your screenshots
 
 ```
 Kensaku (検索) is local-first file search and a launcher for
-Windows/macOS/Linux. It indexes file names (~1ms across 100k files,
-benchmarks with methodology in the repo), full text in PDFs/DOCX/PPTX and
-code, OCR'd text inside screenshots via Tesseract or an optional
-PP-OCRv6 pack, and semantic matches — "the PDF about database indexing"
-finds notes-final-2.pdf. No cloud, no account, MIT.
+Windows/macOS/Linux. It indexes file names (milliseconds across 100k
+files, benchmarks with methodology in the repo), full text in
+PDFs/DOCX/PPTX and code, OCR'd text inside screenshots via PP-OCRv6 by
+default (bundled runtime, Tesseract fallback), and semantic matches —
+"the PDF about database indexing" finds notes-final-2.pdf. No cloud, no
+account, MIT.
 
 I built it because I kept losing screenshots of errors I could describe
 but not name. Indexing is a single pass — each file feeds both the name
 and text indexes once — with incremental updates on change.
 
-Honest limits: builds are unsigned, no auto-updater yet, thumbnails are
-images-only. Windows is the most-tested build; macOS/Linux feedback is
-the thing I want most: github.com/yjid/kensaku
+Honest limits: builds are unsigned, thumbnails are images-only, and
+visual search is still a beta download rather than part of results.
+Windows is the most-tested build; macOS/Linux feedback is the thing I
+want most: github.com/yjid/kensaku
 ```
 
 ### Author first comment (post immediately — the technical deep-dive)
@@ -109,26 +119,32 @@ docs/ARCHITECTURE.md):
   custom mmap format for crash safety and free migrations; the mmap
   Everything-style format is the documented next step if cold load ever
   exceeds 400ms at 1M files.
-- Name search is served from the in-memory tier (2-4ms budget). Full text
-  is Tantivy (batched). We benchmarked SQLite F5 trigram as a replacement
-  and rejected it: 918 MB and 258ms broad BM25 vs Tantivy's numbers in
-  docs/BENCHMARKS.md.
-- Semantic tier: model2vec static embeddings (potion-base-8M, 256-dim,
-  i8-quantized, ~7.7MB table). No ONNX and no neural graph at query time —
-  tokenize, table lookup, weighted mean, normalize, ~50µs/query, ~92% of
-  MiniLM's MTEB average. An optional 40MB pack (fastembed + bge-small) is
-  available for higher quality.
-- OCR: PP-OCRv6 by default (bundled runtime); optional Indra engine (higher quality, ~27 MB pack) and Tesseract fallback
-  (load-dynamic — the static ORT build requires AVX2 and SIGILLs older
-  CPUs).
-- The launcher destroys its webview when hidden and rebuilds on summon;
-  idle state is ~20MB private on Windows with a 24.5k-file index loaded.
+- Name search is served from the in-memory tier. On the 100k Windows
+  corpus that is 17–19 ms with the default 16-thread pool, 3.1 ms at 4
+  threads, and 1.3 ms on the warm Linux reference — the char-bloom
+  prefilter makes each entry cheap enough that oversubscription costs
+  more than it saves. Full text is Tantivy (batched). We benchmarked
+  SQLite FTS5 trigram as a replacement and rejected it: 918 MB and much
+  slower broad queries at 1M documents (docs/BENCHMARKS.md).
+- Semantic tier: a static embedding table (potion-base-8M-style, 256-dim,
+  i8-quantized, ~7.3 MiB). No ONNX and no neural graph at query time —
+  tokenize, table lookup, weighted mean, normalize. An optional smart
+  pack exists behind a feature flag; its quality and footprint are not
+  yet measured, so the static table remains the shipped path.
+- OCR: PP-OCRv6 by default (bundled runtime); optional Indra engine
+  (higher quality, ~27 MB pack) and Tesseract fallback (system binary,
+  used on Intel Macs where the bundled runtime is unavailable).
+- Closing the launcher destroys its webview and keeps the Rust index
+  warm; reopening does not rebuild metadata or Tantivy. The 100k-file
+  metadata layer is 128 B per entry, about 12.2 MB.
 - Agent access is read-only over MCP/loopback HTTP, budgeted in size,
   content returned as data never instructions.
 
 Known tradeoffs we argued about: unsigned binaries (signing costs are
-real for an independent app), no auto-updater yet, thumbnails image-only
-for now. What would you want an extractor for next?
+real for an independent app), thumbnails image-only for now, and visual
+search not yet wired into results. Updates ship in-app: size-checked and
+verified against the release SHA256SUMS before install. What would you
+want an extractor for next?
 ```
 
 ---
@@ -152,9 +168,9 @@ github.com/yjid/kensaku
 ### Follow-up (reply to own post)
 
 ```
-Alt+Space to summon, type, Enter. 9 MB installer, ~20 MB idle in the
-tray. Your AI agent can search the same index over MCP — read-only,
-nothing leaves the machine.
+Alt+Space to summon, type, Enter. The 1.0.16 Windows setup is 14.3 MB;
+about 12 MB of metadata covers 100,000 files. Your AI agent can search
+the same index over MCP — read-only, nothing leaves the machine.
 ```
 
 ---
@@ -215,9 +231,10 @@ So it reads the pixels. OCR, built in. Plus meaning-based search, natural
 language time filters, and MCP so your AI agent can search the same index
 read-only. Nothing leaves the machine. MIT.
 
-Honest limits: unsigned builds, no auto-updater yet, Windows is the
-most-tested platform. macOS/Linux come from CI and need real-world
-testing — that's the feedback I'm here for. What would you search for first?
+Honest limits: unsigned builds, visual search still a beta download, and
+Windows is the most-tested platform. macOS/Linux come from CI and need
+real-world testing — that's the feedback I'm here for. What would you
+search for first?
 ```
 
 **Rules that matter on PH:** launch at 00:01 PT (Tuesday–Thursday), the maker
@@ -240,9 +257,9 @@ not name. It indexes your files and reads inside them — PDFs, code, logs,
 and the text in screenshots via OCR. It also finds by meaning and parses
 things like "screenshots from last week".
 
-Numbers that matter to me right now: ~20 MB idle in the tray, 9 MB
-installer, 1.3 ms name search across 100k files, 0 bytes to the cloud.
-MIT, free.
+Numbers that matter to me right now: about 12 MB of metadata for 100,000
+files, a 14.3 MB Windows setup, filename search in 3–19 ms across that
+corpus depending on thread count, and 0 bytes to the cloud. MIT, free.
 
 I'm not charging for it. The goal is to build the launcher people
 actually want to use, then figure out the business. macOS and Linux come
@@ -270,8 +287,8 @@ text search across PDFs/DOCX/code, meaning-based matches, and natural
 language time filters ("screenshots from last week"). Everything stays on
 your machine — no account, no telemetry, no cloud.
 
-Stack: Rust, Tauri 2, SQLite + Tantivy, model2vec for semantic search.
-MIT licensed, free. Windows/macOS/Linux.
+Stack: Rust, Tauri 2, SQLite + Tantivy, a static embedding table for
+semantic search. MIT licensed, free. Windows/macOS/Linux.
 
 If you try it and it breaks, tell me — that's the most useful thing
 right now: github.com/yjid/kensaku
@@ -301,7 +318,8 @@ MIT. github.com/yjid/kensaku
 1. The itch — the screenshot problem, with the concrete example
 2. Why "filename search" tools leave money on the table
 3. The architecture: SQLite WAL as durable truth, in-memory snapshot, Tantivy
-   for text, model2vec for meaning, Tesseract + PP-OCRv6 for pixels
+   for text, a static embedding table for meaning, PP-OCRv6 for pixels with
+   Tesseract as the fallback
 4. The hard parts: webview destruction on hide, OCR budgeting, keeping memory
    flat on large folders, the theme bug that wouldn't die
 5. Benchmarks with methodology (link docs/BENCHMARKS.md)
@@ -319,8 +337,8 @@ demo clip outperform text-only posts by a wide margin on every platform.
       memory" → results appear → Enter opens the screenshot. One take.
       Save as `demo.gif` (≤8 MB for GitHub) and an MP4 for PH/X.
 - [ ] **Static hero screenshot:** home screen with real recents + a search
-      in progress. Replace `assets/search-at-full-speed.png` if you can
-      (the current one is from before 1.0.6).
+      in progress. Refresh `assets/search-at-full-speed.png` if it predates
+      the current UI (the bundled one is from before 1.0.16).
 - [ ] **Social preview:** upload `assets/social-preview.png` in repo
       Settings → Social preview (GitHub doesn't allow this via API).
 - [ ] **One-liner for bios:** "I build Kensaku — local search that reads

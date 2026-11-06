@@ -1,6 +1,6 @@
 # Multilingual & Language Support in Kensaku
 
-Kensaku is designed from the ground up for **local-first, multilingual search**. Whether searching through codebase repositories in 50+ programming languages, mixed-script documents (e.g., Japanese/English technical specs), or extracting text from screenshots and scanned invoices across European, Asian, and Middle-Eastern scripts, all processing occurs 100% locally on your machine with zero cloud round-trips.
+Kensaku is designed from the ground up for **local-first, multilingual search**. Whether searching through codebase repositories in 50+ code and data formats, mixed-script documents (e.g., Japanese/English technical specs), or extracting text from screenshots and scanned invoices across European, Asian, and Middle-Eastern scripts, all processing occurs 100% locally on your machine with zero cloud round-trips.
 
 ---
 
@@ -95,7 +95,7 @@ For images (`.png`, `.jpg`, `.jpeg`, `.webp`, `.bmp`, `.tiff`, `.gif`) and scann
 |---|---|---|---|
 | **Engine Type** | Native Rust ONNX Runtime port | Native Rust ONNX Runtime port | System C++ library binding |
 | **Model Size** | ~27 MB (8 ONNX models) | ~6 MB (compact tiny model) | Depends on system packages |
-| **Download Mode** | On-demand upon selection | On-demand upon selection | Installed by user via package manager |
+| **Download Mode** | On demand when selected | Automatic on first use (setup can pre-fetch) | Installed by user via package manager |
 | **Script Routing** | Automatic via `script.onnx` classifier | Single joint multilingual model | Requires `-l` language pack flags |
 | **Supported Scripts** | • Latin & Cyrillic (`rec.onnx`)<br>• CJK (`rec_cjk.onnx`)<br>• RTL / Arabic / Hebrew (`rec_rtl.onnx`)<br>• Indic & World (`rec_world.onnx`) | Latin, Chinese, Japanese, Korean, Cyrillic | Broad language coverage via `tessdata` |
 | **Orientation & Deskew** | Automatic (`orient.onnx`) | Fixed angle detection | Leptonica deskew |
@@ -107,14 +107,20 @@ In `config.json` (see [`docs/CONFIG.md`](CONFIG.md)):
 ```json
 {
   "ocr_enabled": true,
-  "ocr_engine": "indra",
-  "ocr_max_image_bytes": 10485760
+  "ocr_engine": "accurate",
+  "ocr_languages": ["eng"],
+  "ocr_max_image_bytes": 0
 }
 ```
 
 * `ocr_enabled` (`bool`): Toggle OCR on or off. Defaults to `true`.
-* `ocr_engine` (`string`): Choose `"indra"`, `"accurate"` (PP-OCR), `"tesseract"`, or `"none"`.
-* `ocr_max_image_bytes` (`int`): Maximum image file size to run OCR on (in bytes). `0` uses the default safe threshold (20 MB).
+* `ocr_engine` (`string`): `"accurate"` (PP-OCRv6, default), `"indra"`, or `"tesseract"`.
+  Indra falls back to PP-OCR and then Tesseract when its pack cannot load;
+  PP-OCR falls back to Tesseract.
+* `ocr_languages` (`string[]`): Tesseract language codes. Empty means English
+  when installed.
+* `ocr_max_image_bytes` (`int`): Skip OCR above this size in bytes. `0` means no
+  limit.
 
 ---
 
@@ -124,13 +130,17 @@ Kensaku extracts formatted text from structured document formats, decoding XML e
 
 | Format | Extensions | Extraction Method |
 |---|---|---|
-| **PDF Documents** | `.pdf` | Native `lopdf` stream extraction; falls back to OCR for scanned or image-only pages. |
-| **Microsoft Word** | `.docx`, `.doc` | ZIP-stream XML extraction (`word/document.xml`), XML entity decoding. |
-| **Microsoft Excel** | `.xlsx`, `.xls` | Shared string table accumulation across all cell `<t>` tags. |
-| **Microsoft PowerPoint** | `.pptx`, `.ppt` | Slide text extraction across slide XML trees. |
+| **PDF Documents** | `.pdf` | Native `lopdf` text-layer extraction; scanned/image-only pages fall back to OCR, one page at a time. |
+| **Microsoft Word** | `.docx` | ZIP-stream XML extraction (`word/document.xml`), XML entity decoding. |
+| **Microsoft Excel** | `.xlsx` | Shared string table accumulation across all cell `<t>` tags. |
+| **Microsoft PowerPoint** | `.pptx` | Slide text extraction across slide XML trees. |
 | **OpenDocument** | `.odt`, `.ods`, `.odp` | OASIS OpenDocument XML stream extraction (`content.xml`). |
 | **eBooks & Rich Text** | `.epub`, `.rtf` | OEBPS HTML/XHTML extraction; RTF control word stripping. |
-| **Apple iWork** | `.pages`, `.key`, `.numbers` | Sniffed and extracted via native zip indexers. |
+| **Delimited text** | `.csv`, `.tsv` | Delimiter sniff; rows become `column = "value"` with the header repeated. |
+
+> Legacy binary Office formats (`.doc`, `.xls`, `.ppt`) and Apple iWork files
+> are not decoded natively. Use an [external extractor](EXTRACTORS.md) if you
+> need them.
 
 ---
 

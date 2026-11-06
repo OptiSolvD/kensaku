@@ -9,10 +9,11 @@ Download from [Releases](https://github.com/yjid/kensaku/releases).
 | Linux | `kensaku_<ver>_amd64.AppImage` | chmod +x and run; no install needed |
 | Linux | `kensaku_<ver>_amd64.deb` | `sudo apt install ./kensaku_*.deb` |
 | Linux | `kensaku-<ver>-1.x86_64.rpm` | `sudo rpm -i kensaku-*.rpm` |
-| macOS | `Kensaku_<ver>_universal.dmg` | Intel + Apple Silicon |
-| Windows | `Kensaku_<ver>_x64_en-US.msi` | per-user install |
+| macOS | `kensaku_<ver>_universal.dmg` | Intel + Apple Silicon |
+| Windows | `kensaku_<ver>_x64-setup.exe` or `kensaku_<ver>_x64_en-US.msi` | per-user install |
 | Windows | `kensaku-portable-<ver>-x64.zip` | portable: unzip in a writable folder, run `kensaku.exe`; config/index/data live in `data\` next to the exe, nothing in `%APPDATA%`. Keeps the `portable` marker file in place. |
-| Windows on ARM | `Kensaku_<ver>_arm64_en-US.msi`, `kensaku_<ver>_arm64-setup.exe`, `kensaku-portable-<ver>-arm64.zip`, `kensaku-cli-windows-aarch64.exe` | native ARM64 (Snapdragon) builds; same layout as x64 |
+| Windows on ARM | `kensaku_<ver>_arm64-setup.exe`, `kensaku_<ver>_arm64_en-US.msi`, `kensaku-portable-<ver>-arm64.zip`, `kensaku-cli-windows-aarch64.exe` | native ARM64 (Snapdragon) builds; same layout as x64 |
+| Agent CLI | `kensaku-cli-{linux,macos,windows}-*` | Standalone CLI/MCP binary for each platform. |
 
 ### The builds are unsigned
 
@@ -40,7 +41,7 @@ notarized releases. Verify downloads with the published `SHA256SUMS`.
 ### All platforms
 
 - Rust stable (edition 2024)
-- [Bun](https://bun.sh) 1.1+ (Node 18+ also works)
+- [Bun](https://bun.sh) 1.1+ (recommended); Node.js 20.19+ also works with npm
 - Git
 
 ### Linux (Debian/Ubuntu)
@@ -155,18 +156,35 @@ Then point your MCP client at it:
 
 If `kensaku-cli` is not on `PATH`, use the absolute path in `command`.
 
-CLI binaries are published as **workflow artifacts** on the release run (the
-desktop bundles are the release assets). Build from source, or download the
-artifact from the Actions run.
+CLI binaries are published as **release assets** alongside the desktop bundles
+(`kensaku-cli-linux-*`, `kensaku-cli-macos-*`, `kensaku-cli-windows-*`), and
+`SHA256SUMS` covers them. Build from source if you prefer.
 
 ---
 
-## OCR (optional)
+## OCR
 
-OCR needs the `tesseract` binary **and** language data. Kensaku can download
-`eng.traineddata` (~4 MB) into its own directory from the guided setup flow
-(**About → Run setup again → Optional packs**), so you don't need root. If you
-prefer a system install:
+OCR works out of the box. PP-OCRv6 tiny is compiled into normal builds via the
+default `accurate-ocr` feature, and its ~6.1 MB model pack is downloaded on first
+use. Installers bundle ONNX Runtime 1.31 (Windows, Apple silicon, Linux x64).
+Native macOS/Windows OCR is **not** implemented.
+
+In **Setup → Optional packs** and Settings → Search you pick one engine:
+
+| Engine | Download | Notes |
+|---|---|---|
+| PP-OCRv6 (`accurate`) | ~6.1 MB (detector 1.7 MB, recognizer 4.3 MB, dictionary 27 KB) | Default. Runs in-process on ONNX Runtime. |
+| Indra (`indra`) | ~27 MB (8 models) | Higher quality: deskew, orientation, multi-script routing. |
+| Tesseract (`tesseract`) | System package + `tessdata` | Fallback where ONNX cannot run (Intel Macs, `--no-default-features`). |
+
+Packs are verified against pinned SHA-256 checksums. Settings → Search shows the
+selected engine's status and lets you choose Tesseract languages. Doctor repeats
+the check. If the PP-OCR/Indra pack is missing, extraction falls back to
+Tesseract.
+
+Tesseract needs the binary **and** language data. Kensaku can download
+`eng.traineddata` (~4 MB) into its own directory from setup, so you don't need
+root. A system install also works:
 
 ```bash
 # Linux (Debian/Ubuntu)
@@ -179,25 +197,6 @@ brew install tesseract
 winget install UB-Mannheim.TesseractOCR
 ```
 
-Settings → Search shows one of four states: ready (with languages), engine found
-but no language data (points to setup), engine missing (platform install command),
-or unknown. The OCR switch is disabled until OCR can actually work. Doctor repeats
-the same check.
-
-### OCR packs
-
-Normal app builds compile the PP-OCRv6 tiny engine via the default
-`accurate-ocr` feature. In **Setup → Optional packs** and Settings → Search you
-pick **one** OCR engine: PP-OCRv6 (default, recommended), Indra (higher
-quality: deskew, orientation and multi-script recognition) or Tesseract. Only
-the selected engine's download is offered. PP-OCRv6
-is ~6.1 MB (detector 1.7 MB, recognizer 4.3 MB, dictionary 27 KB); the Indra
-pack is ~27 MB — both are verified
-against pinned SHA-256 checksums. Release installers bundle ONNX Runtime 1.31 (Windows, Apple silicon, Linux x64). If the pack is
-missing, or the build uses `--no-default-features`, Kensaku falls back to
-Tesseract. Native macOS/Windows OCR is not implemented yet and the Settings
-option is disabled.
-
 Models: PaddleOCR PP-OCRv6 tiny (Apache-2.0), published by PaddlePaddle; Indra
 weights by Datalab (indra-ocr), under a modified OpenRAIL-M license. The Rust
 ONNX wrapper is `paddleocr_rs_onnx` (MIT).
@@ -208,10 +207,11 @@ ONNX wrapper is `paddleocr_rs_onnx` (MIT).
 
 1. Pick folders (Home, Projects, Documents, Downloads).
 2. Choose an exclusion preset (Developer / Creative / All-round).
-3. Set preferences (theme, global shortcut). Click the shortcut field and press
-   the key combo; Esc cancels.
-4. Optionally download OCR language data and the semantic model. Each button
-   shows live state (downloading, progress, ready, or the error).
+3. Set preferences: theme, interface language, window mode (Launcher is the
+   default; Desktop app is one click away), and the global shortcut. Click the
+   shortcut field and press the key combo; Esc cancels.
+4. Optionally download OCR data and the semantic model. Each button shows live
+   state (downloading, progress, ready, or the error).
 5. Start. The first scan shows live counts, a progress bar, and an ETA, then ends
    with a Done summary; later launches are search-first and instant. You can
    search while indexing runs.
@@ -225,17 +225,17 @@ The index lives at:
 | Windows | `%APPDATA%\kensaku\` |
 
 Contents: `config.json`, `metadata.db` (SQLite WAL), `index/` (Tantivy),
-`thumbs/`, optional `models/`, `crash.log`.
+`thumbs/`, optional `models/`, `ocr/`, `ocr-indra/`, `tessdata/`, `kensaku.log`,
+and a failure-only `crash.log`.
 
 ---
 
-## Uninstall / reset
+## Reset
 
-- **Reset inside the app:** Settings → About → **Reset everything** (type `RESET`).
-  Deletes the index, database, models, and config, then restarts.
-- **Manual:** quit Kensaku, delete the config directory above.
-- **Uninstall:** remove the app bundle/package; the data directory is separate.
-
+Settings → About → **Reset everything** (type `RESET`) deletes the index,
+database, thumbnails, and config, then restarts. Downloaded OCR and model packs
+are kept unless you tick the box to remove them. Uninstall steps are
+[below](#uninstalling).
 
 ## Linux
 
@@ -299,6 +299,7 @@ beyond that entry.
 
 ### Reset instead of uninstalling
 
-Settings → About → Reset all clears your settings, index and cached data and
-keeps the app installed. Downloaded OCR and model packs are kept by default, so
-search works again immediately; tick the box in the dialog to remove them too.
+Settings → About → **Reset everything** clears your settings, index and cached
+data and keeps the app installed. Downloaded OCR and model packs are kept by
+default, so search works again immediately; tick the box in the dialog to remove
+them too.

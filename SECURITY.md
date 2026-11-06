@@ -30,12 +30,14 @@ be safe when pointed at untrusted files.
 
 ## Controls
 
-- **Extraction isolation.** Parsers run on a bounded worker pool with an 8-second
+- **Extraction isolation.** Parsers run on a bounded worker pool with a per-file
   timeout and panic isolation. XML external entities/DTDs are not resolved.
-- **Decode caps.** Images are limited to 50 MP; content is capped at 1 MB indexed
-  and 20 MB extraction ceiling.
-- **No shell.** Files are opened through OS APIs; the agent surface has no write,
-  shell, or network tools.
+- **Decode caps.** Images are limited to 50 MP; text extraction is capped at
+  100 MB per file and 4 MB of indexed text, with 48 semantic units per document.
+  Dense images and scanned PDFs get up to 45 s; other extraction timeouts scale
+  with file size.
+- **No shell.** Files are opened through OS APIs; the agent surface has no
+  shell or network tools. The only write action is `reindex`, and it is opt-in.
 - **Read-only agent access.** `kensaku-cli` and the MCP server open the index
   without the Tantivy writer lock and cannot mutate it.
 - **UI escaping.** Indexed content (filenames, snippets, previews) is rendered as
@@ -64,7 +66,15 @@ should still be added to exclusions.
 
 ## Agent surface
 
-- Bind to stdio only; no TCP listener.
+- **stdio by default.** No network listener unless you explicitly run
+  `kensaku-cli serve`, which binds loopback only, requires the bearer token in
+  `<config>/http.token` (0600), and checks the peer on every connection.
+- **Read-only.** No shell and no write tools. `reindex` is listed only when
+  `mcp_allow_reindex=true` and the daemon is running; the HTTP transport never
+  enables it.
+- **Scoped reads.** `agent_scoped_roots` restricts results and single-path reads.
+  Paths are resolved before comparison, so `..` and symlink escapes are rejected.
+  Credential files and excluded extensions are refused even inside a scope.
 - Logs go to stderr, never stdout, so protocol streams stay clean.
 - Tool responses are token-budgeted; file content is data, never instructions.
 - No `.gitignore` bypass by default — agents see what the index contains.
@@ -72,5 +82,8 @@ should still be added to exclusions.
 ## Release integrity
 
 Current release builds are **unsigned** (see `docs/INSTALL.md`). Verify downloads
-against the checksums attached to the GitHub release. Signing and notarization are
-tracked in the project issue tracker.
+against `SHA256SUMS` attached to the GitHub release. In-app updates compare the
+download with the expected size and verify it against the release checksums
+before running the installer; portable installs are told to replace the folder
+instead of installing a second copy. Signing and notarization are tracked in the
+project issue tracker.

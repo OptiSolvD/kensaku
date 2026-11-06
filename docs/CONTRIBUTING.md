@@ -30,11 +30,12 @@ cargo clippy --all-targets --manifest-path src-tauri/Cargo.toml -- -D warnings
 
 # Web
 npx tsc --noEmit
+bun run test
 bun run build
 ```
 
-All four must pass. Do not add `#[allow]` to silence a lint without a comment
-explaining why.
+All five must pass. The Rust suite has 500+ tests; the frontend has a `vitest`
+suite. Do not add `#[allow]` to silence a lint without a comment explaining why.
 
 ## Tests
 
@@ -68,15 +69,17 @@ If you change layout or interaction, include a screenshot in both themes and che
 ## Performance changes
 
 If you touch the query path or the indexer, include before/after numbers from
-`cargo run --example bench --release -- <dir>` (methodology in
-[`BENCHMARKS.md`](BENCHMARKS.md)). Regressions above ~20% need justification.
+`cargo run --manifest-path src-tauri/Cargo.toml --example bench --release -- <dir>`
+(methodology in [`BENCHMARKS.md`](BENCHMARKS.md)). Regressions above ~20% need
+justification.
 
 ## What we are not accepting (for now)
 
 - An in-app LLM or chat panel — Kensaku is the search backend for agents.
 - Cloud sync, accounts, telemetry.
 - Writing through the agent API.
-- Bundling large model runtimes by default.
+- Bundling large language-model runtimes by default (ONNX Runtime for OCR is
+  already bundled; a multi-gigabyte chat model is a different product).
 
 Keep changes scoped to the shipped surface; larger product directions should
 start as an issue.
