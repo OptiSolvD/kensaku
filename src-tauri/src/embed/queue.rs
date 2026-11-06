@@ -224,7 +224,7 @@ impl EmbeddingQueue {
                                     node_id,
                                     byte_start: *start,
                                     byte_end: *end,
-                                    model_id: model_ref.model_id,
+                                    model_id: model.model_id,
                                 },
                                 vec.clone(),
                                 content_hash.clone(),
@@ -249,7 +249,7 @@ impl EmbeddingQueue {
                             node_id,
                             unit.byte_start,
                             unit.byte_end,
-                            model_ref.model_id,
+                            model.model_id,
                             &vec,
                         ) {
                             unit.id = inserted_id;

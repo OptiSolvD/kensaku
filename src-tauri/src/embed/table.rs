@@ -74,8 +74,12 @@ impl StaticTable {
         let model_path = dir.join("model.safetensors");
         let mut file = File::open(&model_path)
             .map_err(|e| format!("cannot open {}: {e}", model_path.display()))?;
-        let (embeddings, vocab_size, dim) = parse_safetensors(&mut file)
-            .map_err(|_| format!("{} is not a readable safetensors matrix", model_path.display()))?;
+        let (embeddings, vocab_size, dim) = parse_safetensors(&mut file).ok_or_else(|| {
+            format!(
+                "{} is not a readable safetensors matrix",
+                model_path.display()
+            )
+        })?;
         if dim != EMBEDDING_DIM {
             return Err(format!(
                 "{} has width {dim}, but this build expects {EMBEDDING_DIM}",
@@ -121,8 +125,9 @@ impl StaticTable {
             Err(_) => true,
         };
 
-        let (embeddings, embeddings_i8, embedding_scales) = if use_f32 {
-            (embeddings, Vec::new(), Vec::new())
+        let (embeddings, embeddings_i8, embedding_scales): (Vec<f32>, Vec<i8>, Vec<f32>) =
+            if use_f32 {
+                (embeddings, Vec::new(), Vec::new())
         } else {
             // Quantize first, then drop the f32 matrix before returning so the
             // startup peak does not retain both representations.

@@ -34,7 +34,7 @@ pub struct HeadlessIndex {
     pub content: Option<ContentIndex>,
     pub units: UnitStore,
     pub visual: crate::embed::visual::VisualStore,
-    pub model: &'static ModelRegistry,
+    pub model: std::sync::Arc<ModelRegistry>,
     dir: PathBuf,
 }
 
