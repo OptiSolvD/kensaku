@@ -655,7 +655,10 @@ impl IndexerManager {
             // Apply OCR engine selection and record whether it re-queued
             // images: that is one of the reasons a crawl re-reads files, and
             // the report below has to say why.
-            let ocr_requeued = Self::sync_ocr_state(&config_arc, &metadata);
+            // Captured before the sync writes the new value: a report that
+            // re-reads the file afterwards always shows "no change".
+            let ocr_signature_before = read_ocr_signature();
+            let ocr_queued = Self::sync_ocr_state(&config_arc, &metadata);
 
             let (watched_dirs, excluded_dirs, excluded_exts, crawl_mode, include_ignored) = {
                 let cfg = config_arc.read();
@@ -1276,24 +1279,38 @@ impl IndexerManager {
                     .read()
                     .as_ref()
                     .and_then(|index| index.rebuild_reason.clone());
-                let reason = if let Some(reason) = rebuild_reason {
-                    format!("content index rebuilt: {reason}")
-                } else if content_count == 0 {
-                    "nothing changed".to_string()
-                } else if ocr_requeued {
-                    format!("OCR settings changed ({pending_files} image/PDF pending)")
-                } else if pending_files > 0 || given_up > 0 || !retry_paths.is_empty() {
-                    format!(
-                        "{pending_files} files left pending by an earlier scan, {} retried, {given_up} given up on",
+                // Every contribution is named, not just the first one found.
+                // The old form picked the first matching branch, so a scan
+                // that re-read 93,390 of 100,102 entries reported
+                // "OCR settings changed (0 image/PDF pending)": a cause that
+                // accounted for zero files, presented as the reason for all of
+                // them. A reason nobody can check is worse than no reason.
+                let mut causes: Vec<String> = Vec::new();
+                if let Some(reason) = rebuild_reason {
+                    causes.push(format!("content index rebuilt: {reason}"));
+                }
+                if ocr_queued > 0 {
+                    causes.push(format!(
+                        "OCR settings changed, {ocr_queued} image/PDF queued"
+                    ));
+                }
+                if pending_files > 0 || given_up > 0 || !retry_paths.is_empty() {
+                    causes.push(format!(
+                        "{pending_files} left pending by an earlier scan, {} retried, {given_up} given up on",
                         retry_paths.len().saturating_sub(given_up)
-                    )
-                } else {
-                    // The bucket that needs the most scepticism: a genuine edit
-                    // and an unstable measurement look identical here, so name
-                    // the counts rather than asserting "changed on disk".
-                    format!(
+                    ));
+                }
+                // A genuine edit and an unstable measurement look identical
+                // here, so name the counts rather than asserting a cause.
+                if new_files > 0 || restamped_files > 0 {
+                    causes.push(format!(
                         "{new_files} new, {restamped_files} with a different size or modification time"
-                    )
+                    ));
+                }
+                let reason = if causes.is_empty() {
+                    "nothing changed".to_string()
+                } else {
+                    causes.join("; ")
                 };
 
                 crate::say!(
@@ -1310,9 +1327,9 @@ impl IndexerManager {
                     retried: retry_paths.len().saturating_sub(given_up),
                     abandoned: given_up,
                     reason,
-                    // Recorded after the crawl, so this is what the next
-                    // launch will compare against.
-                    ocr_signature_stored: read_ocr_signature(),
+                    // The value from before this crawl's sync, so a change is
+                    // visible instead of showing "no change" forever.
+                    ocr_signature_stored: ocr_signature_before.clone(),
                     ocr_signature_now: crate::ocr::signature(),
                 });
             }
@@ -1806,16 +1823,20 @@ impl IndexerManager {
     ///   index. On a change (an engine became usable, the user switched, an
     ///   OCR fix shipped) every image and PDF is re-queued and the extraction
     ///   cache dropped. Returns true when it re-queued.
+    /// Returns how many images/PDFs were queued for a re-read. Zero is a
+    /// meaningful answer: the signature changed but nothing was left to
+    /// re-read, and a crawl reason must not blame OCR for work it did not
+    /// cause.
     fn sync_ocr_state(
         config_arc: &Arc<RwLock<KensakuConfig>>,
         metadata: &Arc<RwLock<MetadataStore>>,
-    ) -> bool {
+    ) -> usize {
         let mut config = config_arc.read().clone();
         crate::indexer::extract::image::reset_tesseract_probe();
         crate::indexer::extract::set_ocr_enabled(config.ocr_enabled);
         crate::ocr::set_engine(&config.ocr_engine);
         if !config.ocr_enabled {
-            return false;
+            return 0;
         }
 
         if crate::ocr::accurate_compiled() {
@@ -1857,7 +1878,7 @@ impl IndexerManager {
         let signature = crate::ocr::signature();
         let stored = read_ocr_signature();
         if stored.as_deref() == Some(signature.as_str()) {
-            return false;
+            return 0;
         }
         crate::say_err!(
             "[Kensaku OCR] state changed: was {:?}, now {:?}",
@@ -1869,7 +1890,7 @@ impl IndexerManager {
                 "[Kensaku OCR] no OCR engine can run right now; keeping the recorded state so a \
                  temporary failure does not re-read every image"
             );
-            return false;
+            return 0;
         }
         write_ocr_signature(&signature);
         crate::indexer::extract::clear_cache();
@@ -1880,7 +1901,7 @@ impl IndexerManager {
             crate::ocr::OCR_REVISION,
             marked
         );
-        true
+        marked
     }
 
     /// Starts a crawl now, or as soon as the running one finishes. Used when
@@ -1891,6 +1912,36 @@ impl IndexerManager {
     /// finish while the user has not chosen their folders yet, and the
     /// config then still holds the default roots (the home directory), so
     /// the wrong thing gets scanned and watched.
+    /// Clears semantic units that belong to a different embedding model, then
+    /// starts a crawl so they are rebuilt with the active one.
+    ///
+    /// The same reset runs at construction, which covered the restart case. It
+    /// did not cover downloading the model files while the app is running: the
+    /// units kept hashing vectors while queries used the real model, and two
+    /// different vector spaces compared against each other produce confident
+    /// nonsense. The registry now reloads on download and calls this.
+    pub fn on_semantic_model_changed(self: &Arc<Self>) {
+        let expected_model_id = crate::embed::ModelRegistry::global().model_id;
+        if let Some(db) = self.metadata_store.read().db() {
+            match db.units_model_id() {
+                Ok(Some(existing)) if existing != expected_model_id => {
+                    match db.reset_semantic_index() {
+                        Ok(()) => {
+                            self.unit_store.write().clear();
+                            crate::say_err!(
+                                "[Kensaku] Semantic model changed (units id {existing} -> {expected_model_id}); cleared semantic index for a rebuild"
+                            );
+                        }
+                        Err(e) => crate::say_err!("[Kensaku] Failed to reset semantic index: {}", e),
+                    }
+                }
+                Ok(_) => {}
+                Err(e) => crate::say_err!("[Kensaku] Failed to read semantic model id: {}", e),
+            }
+        }
+        self.start_indexing_when_idle();
+    }
+
     pub fn start_indexing_when_idle(self: &Arc<Self>) {
         if !self.config.read().is_setup_complete {
             return;

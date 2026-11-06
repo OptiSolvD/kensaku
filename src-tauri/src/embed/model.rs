@@ -13,7 +13,36 @@ pub const REAL_MODEL_ID: u32 = 2;
 /// Id of the optional ONNX smart embedding pack (`bge-small-en-v1.5`).
 pub const SMART_MODEL_ID: u32 = 3;
 
-static GLOBAL: OnceLock<ModelRegistry> = OnceLock::new();
+/// The active registry.
+///
+/// This used to be a `OnceLock`, which meant the choice was made once per
+/// process and never revisited. Downloading the model files therefore changed
+/// nothing until the next launch: the files were on disk, Health reported them
+/// present, and search kept ranking on the hashing fallback because the
+/// registry had already decided. That is the worst kind of failure, since it
+/// looks configured. `reload` makes the switch immediate.
+static GLOBAL: OnceLock<parking_lot::RwLock<Option<Arc<ModelRegistry>>>> = OnceLock::new();
+
+fn global_slot() -> &'static parking_lot::RwLock<Option<Arc<ModelRegistry>>> {
+    GLOBAL.get_or_init(|| parking_lot::RwLock::new(None))
+}
+
+fn build_registry() -> ModelRegistry {
+    let dir = KensakuConfig::config_dir().join("models");
+    let config = KensakuConfig::load();
+    let registry = ModelRegistry::from_config_and_dir(&config, &dir);
+    log::info!(
+        "[Kensaku] Semantic provider: {} ({}, model_id: {}, dim: {})",
+        registry.provider,
+        registry.name,
+        registry.model_id,
+        registry.dim
+    );
+    if let Some(ref reason) = registry.fallback_reason {
+        log::warn!("[Kensaku] Semantic model fallback: {}", reason);
+    }
+    registry
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelRegistry {
@@ -100,15 +129,16 @@ impl ModelRegistry {
         match model_str.as_str() {
             "none" | "off" | "disabled" => Self::new_none(),
             "static" | "potion" => {
-                if let Some(registry) = Self::load_with_f32(dir, config.semantic_f32_table) {
-                    registry
-                } else {
-                    let mut reg = Self::new_static();
-                    reg.fallback_reason = Some(format!(
-                        "Model artifacts not found in {}; using hashing fallback",
-                        dir.display()
-                    ));
-                    reg
+                // Name the failing step: "not found" was reported for every
+                // failure, including files that are present and unparseable.
+                match Self::load_with_f32_reason(dir, config.semantic_f32_table) {
+                    Ok(registry) => registry,
+                    Err(reason) => {
+                        let mut reg = Self::new_static();
+                        reg.fallback_reason =
+                            Some(format!("{reason}; using the hashing fallback"));
+                        reg
+                    }
                 }
             }
             "smart" => {
@@ -170,25 +200,49 @@ impl ModelRegistry {
         }
     }
 
-    /// Process-wide registry. Loads the active embedding provider once.
-    /// Hot paths must use this instead of `ModelRegistry::default()`.
-    pub fn global() -> &'static ModelRegistry {
-        GLOBAL.get_or_init(|| {
-            let dir = KensakuConfig::config_dir().join("models");
-            let config = KensakuConfig::load();
-            let registry = Self::from_config_and_dir(&config, &dir);
-            log::info!(
-                "[Kensaku] Semantic provider: {} ({}, model_id: {}, dim: {})",
-                registry.provider,
-                registry.name,
-                registry.model_id,
-                registry.dim
-            );
-            if let Some(ref reason) = registry.fallback_reason {
-                log::info!("[Kensaku] Semantic model fallback: {}", reason);
+    /// Process-wide registry. Hot paths must use this instead of
+    /// `ModelRegistry::default()`.
+    ///
+    /// Returns an `Arc` so a caller can keep a consistent registry across a
+    /// reload without holding a lock.
+    pub fn global() -> Arc<ModelRegistry> {
+        let slot = global_slot();
+        if let Some(existing) = slot.read().as_ref() {
+            return Arc::clone(existing);
+        }
+        let mut guard = slot.write();
+        if let Some(existing) = guard.as_ref() {
+            return Arc::clone(existing);
+        }
+        let built = Arc::new(build_registry());
+        *guard = Some(Arc::clone(&built));
+        built
+    }
+
+    /// Rebuilds the registry from disk and makes it active.
+    ///
+    /// Called after the model files are downloaded or deleted, so the change
+    /// takes effect without a restart. Returns the previous `model_id` and the
+    /// new one when they differ, which means stored vectors belong to a
+    /// different model and have to be rebuilt.
+    pub fn reload() -> Option<(u32, u32)> {
+        let previous_model_id = {
+            let slot = global_slot();
+            slot.read().as_ref().map(|existing| existing.model_id)
+        };
+        let rebuilt = Arc::new(build_registry());
+        let next_model_id = rebuilt.model_id;
+        *global_slot().write() = Some(rebuilt);
+        match previous_model_id {
+            Some(previous) if previous != next_model_id => {
+                log::warn!(
+                    "[Kensaku] Semantic model changed ({previous} -> {next_model_id}); \
+                     semantic index must be rebuilt"
+                );
+                Some((previous, next_model_id))
             }
-            registry
-        })
+            _ => None,
+        }
     }
 
     /// True when semantic indexing and querying are active.

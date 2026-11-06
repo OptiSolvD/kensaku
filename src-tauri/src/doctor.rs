@@ -525,6 +525,19 @@ fn check_semantic_index(units: usize) -> DoctorCheck {
         )
     };
 
+    // A fallback means the vectors are meaningless even though everything
+    // "works": the count is high, queries return results, and the ranking is
+    // noise. Reporting ok here is how a user concludes semantic search is fine
+    // while it is quietly useless.
+    if model.fallback_reason.is_some() {
+        return warn(
+            ID,
+            LABEL,
+            detail,
+            Some("Download the model files, then rebuild the semantic index.".to_string()),
+        );
+    }
+
     if units > 0 {
         ok(ID, LABEL, detail)
     } else {
@@ -661,16 +674,41 @@ fn check_models() -> DoctorCheck {
     let total = status.artifacts.len();
 
     if status.ready {
-        ok(
-            ID,
-            LABEL,
-            format!(
-                "{}/{} artifacts present ({})",
-                present,
-                total,
-                format_bytes(status.total_present_bytes)
+        // Presence is not proof: files that are present but unreadable leave
+        // the provider on the hashing fallback, and this row used to report ok
+        // anyway while the semantic row reported a fallback. Verify the load.
+        let dir = models::models_dir();
+        let config = crate::config::KensakuConfig::load();
+        return match crate::embed::table::StaticTable::load_with_f32_reason(
+            &dir,
+            config.semantic_f32_table,
+        ) {
+            Ok(_) => ok(
+                ID,
+                LABEL,
+                format!(
+                    "{}/{} artifacts present ({}) and loadable",
+                    present,
+                    total,
+                    format_bytes(status.total_present_bytes)
+                ),
             ),
-        )
+            Err(reason) => with_action(
+                warn(
+                    ID,
+                    LABEL,
+                    format!(
+                        "{}/{} artifacts present ({}), but they cannot be loaded: {}",
+                        present,
+                        total,
+                        format_bytes(status.total_present_bytes),
+                        reason
+                    ),
+                    None,
+                ),
+                DoctorAction::new("download-models", "Download model files again"),
+            ),
+        };
     } else {
         let missing = status
             .artifacts

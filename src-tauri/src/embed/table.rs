@@ -60,16 +60,40 @@ impl StaticTable {
     /// [`crate::config::KensakuConfig::semantic_f32_table`] for a persisted
     /// switch.
     pub fn load_with_f32(dir: &Path, use_f32: bool) -> Option<Self> {
+        Self::load_with_f32_reason(dir, use_f32).ok()
+    }
+
+    /// Same load, but names the step that failed.
+    ///
+    /// The boolean form above loses the reason, and the caller reported every
+    /// failure as "model artifacts not found". That was wrong: files that are
+    /// present but unparseable, or a matrix of the wrong width, produce the
+    /// same message and send whoever is debugging to look at the wrong thing.
+    pub fn load_with_f32_reason(dir: &Path, use_f32: bool) -> Result<Self, String> {
         let use_f32 = use_f32 || std::env::var_os("KENSAKU_F32_TABLE").is_some();
-        let mut file = File::open(dir.join("model.safetensors")).ok()?;
-        let (embeddings, vocab_size, dim) = parse_safetensors(&mut file)?;
+        let model_path = dir.join("model.safetensors");
+        let mut file = File::open(&model_path)
+            .map_err(|e| format!("cannot open {}: {e}", model_path.display()))?;
+        let (embeddings, vocab_size, dim) = parse_safetensors(&mut file)
+            .map_err(|_| format!("{} is not a readable safetensors matrix", model_path.display()))?;
         if dim != EMBEDDING_DIM {
-            return None;
+            return Err(format!(
+                "{} has width {dim}, but this build expects {EMBEDDING_DIM}",
+                model_path.display()
+            ));
         }
 
-        let tokenizer_bytes = std::fs::read(dir.join("tokenizer.json")).ok()?;
-        let tokenizer: Value = serde_json::from_slice(&tokenizer_bytes).ok()?;
-        let tokenizer_parts = parse_tokenizer(&tokenizer, vocab_size)?;
+        let tokenizer_path = dir.join("tokenizer.json");
+        let tokenizer_bytes = std::fs::read(&tokenizer_path)
+            .map_err(|e| format!("cannot read {}: {e}", tokenizer_path.display()))?;
+        let tokenizer: Value = serde_json::from_slice(&tokenizer_bytes)
+            .map_err(|_| format!("{} is not valid JSON", tokenizer_path.display()))?;
+        let tokenizer_parts = parse_tokenizer(&tokenizer, vocab_size).ok_or_else(|| {
+            format!(
+                "{} does not match the matrix vocabulary ({vocab_size} rows)",
+                tokenizer_path.display()
+            )
+        })?;
 
         let normalize = match std::fs::read(dir.join("config.json")) {
             Ok(bytes) => match serde_json::from_slice::<Value>(&bytes) {
@@ -82,7 +106,9 @@ impl StaticTable {
                         .and_then(|v| v.as_u64())
                         && size as usize != dim
                     {
-                        return None;
+                        return Err(format!(
+                            "config.json declares width {size}, but the matrix has width {dim}"
+                        ));
                     }
                     config
                         .get("normalize")
@@ -105,7 +131,7 @@ impl StaticTable {
             (Vec::new(), quantized, scales)
         };
 
-        Some(Self {
+        Ok(Self {
             embeddings,
             embeddings_i8,
             embedding_scales,
@@ -589,6 +615,50 @@ mod tests {
             tag,
             nanos
         ))
+    }
+
+    #[test]
+    fn load_reason_names_the_missing_file_instead_of_saying_not_found() {
+        // The old path reported every failure as "model artifacts not found",
+        // including the case where the file is there and unreadable. Health
+        // then said the models were fine while the loader refused them, and
+        // whoever read it looked in the wrong place.
+        let dir = temp_dir("reason-missing");
+        std::fs::create_dir_all(&dir).unwrap();
+        let reason = StaticTable::load_with_f32_reason(&dir, false).unwrap_err();
+        assert!(
+            reason.contains("model.safetensors"),
+            "reason must name the file it could not open, got: {reason}"
+        );
+
+        // Present, but not a safetensors file.
+        std::fs::write(dir.join("model.safetensors"), b"not a matrix").unwrap();
+        let reason = StaticTable::load_with_f32_reason(&dir, false).unwrap_err();
+        assert!(
+            !reason.contains("cannot open"),
+            "an unreadable matrix must not be reported as missing, got: {reason}"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn load_reason_reports_a_width_mismatch_rather_than_not_found() {
+        let dir = temp_dir("reason-width");
+        std::fs::create_dir_all(&dir).unwrap();
+        // A valid matrix of the wrong width: 4 floats per row.
+        let rows = 8usize;
+        let data = vec![0u8; rows * 4 * 4];
+        std::fs::write(
+            dir.join("model.safetensors"),
+            safetensors_bytes("F32", &[rows, 4], &data),
+        )
+        .unwrap();
+        let reason = StaticTable::load_with_f32_reason(&dir, false).unwrap_err();
+        assert!(
+            reason.contains(&EMBEDDING_DIM.to_string()),
+            "reason must state the width this build expects, got: {reason}"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

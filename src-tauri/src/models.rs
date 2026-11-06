@@ -424,6 +424,16 @@ pub fn download_all() {
 /// verifying.
 static OCR_PACK_READY: OnceLock<Box<dyn Fn() + Send + Sync>> = OnceLock::new();
 
+/// Called once the semantic model files have finished downloading and
+/// verifying. The registry is reloaded before the callback runs, so a callback
+/// that starts a reindex sees the real model rather than the fallback.
+static SEMANTIC_MODELS_READY: OnceLock<Box<dyn Fn() + Send + Sync>> = OnceLock::new();
+
+/// Registers what to do when the semantic model files become available.
+pub fn on_semantic_models_ready(callback: impl Fn() + Send + Sync + 'static) {
+    let _ = SEMANTIC_MODELS_READY.set(Box::new(callback));
+}
+
 /// Registers what to do when the OCR pack becomes available (start a crawl
 /// so already-indexed images are OCR'd). First registration wins.
 pub fn on_ocr_pack_ready(callback: impl Fn() + Send + Sync + 'static) {
@@ -515,6 +525,21 @@ fn run_download(dir: PathBuf, artifacts: &'static [Artifact], label: &'static st
                 // the download as finished.
                 DOWNLOADING.store(false, Ordering::SeqCst);
                 callback();
+            }
+            if std::ptr::eq(artifacts, &ARTIFACTS[..]) {
+                // Without this the files sat on disk while search kept ranking
+                // on the hashing fallback, because the registry was built once
+                // at startup and never rebuilt.
+                let changed = crate::embed::ModelRegistry::reload();
+                DOWNLOADING.store(false, Ordering::SeqCst);
+                if let Some(callback) = SEMANTIC_MODELS_READY.get() {
+                    callback();
+                }
+                if let Some((from, to)) = changed {
+                    crate::say_err!(
+                        "[Kensaku] Semantic model is now {to} (was {from}); vectors must be rebuilt"
+                    );
+                }
             }
         }
         Err(e) => {

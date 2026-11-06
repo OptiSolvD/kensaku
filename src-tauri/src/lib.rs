@@ -398,6 +398,17 @@ pub fn run() {
         });
     }
 
+    // When the semantic model files finish downloading, make the new model
+    // active straight away and rebuild vectors that belonged to the previous
+    // one. Without this the files sat on disk while search kept using the
+    // hashing fallback until the next launch.
+    {
+        let manager = Arc::clone(&indexer_manager);
+        models::on_semantic_models_ready(move || {
+            manager.on_semantic_model_changed();
+        });
+    }
+
     let app_state = AppState {
         indexer: indexer_manager,
         daemon: daemon_client,
