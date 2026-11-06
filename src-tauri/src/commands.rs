@@ -714,7 +714,7 @@ pub async fn get_ocr_pack_status() -> Result<crate::models::ModelsStatus, String
 /// Starts the background download of the accurate OCR pack.
 #[tauri::command]
 pub async fn download_ocr_pack() -> Result<crate::models::ModelsStatus, String> {
-    crate::models::download_ocr_pack();
+    crate::models::download_ocr_pack()?;
     Ok(crate::models::ocr_status())
 }
 
@@ -727,7 +727,7 @@ pub async fn get_indra_pack_status() -> Result<crate::models::ModelsStatus, Stri
 /// Starts the background download of the Indra OCR pack.
 #[tauri::command]
 pub async fn download_indra_pack() -> Result<crate::models::ModelsStatus, String> {
-    crate::models::download_indra_pack();
+    crate::models::download_indra_pack()?;
     Ok(crate::models::indra_status())
 }
 
@@ -740,7 +740,7 @@ pub async fn get_smart_pack_status() -> Result<crate::models::ModelsStatus, Stri
 /// Starts the background download of the smart embedding pack.
 #[tauri::command]
 pub async fn download_smart_pack() -> Result<crate::models::ModelsStatus, String> {
-    crate::models::download_smart_pack();
+    crate::models::download_smart_pack()?;
     Ok(crate::models::smart_status())
 }
 
@@ -753,7 +753,7 @@ pub async fn get_visual_pack_status() -> Result<crate::models::ModelsStatus, Str
 /// Starts the background download of the beta visual-search model pack.
 #[tauri::command]
 pub async fn download_visual_pack() -> Result<crate::models::ModelsStatus, String> {
-    crate::models::download_visual_pack();
+    crate::models::download_visual_pack()?;
     Ok(crate::models::visual_status())
 }
 
@@ -1346,11 +1346,11 @@ pub async fn run_doctor_action(
             Ok("Downloading model files. Semantic search upgrades when it finishes.".to_string())
         }
         "download-ocr-pack" => {
-            crate::models::download_ocr_pack();
+            crate::models::download_ocr_pack()?;
             Ok("Downloading the OCR pack.".to_string())
         }
         "download-indra-pack" => {
-            crate::models::download_indra_pack();
+            crate::models::download_indra_pack()?;
             Ok("Downloading the Indra OCR pack.".to_string())
         }
         "cleanup-storage" => {
