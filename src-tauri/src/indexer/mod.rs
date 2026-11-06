@@ -1822,7 +1822,8 @@ impl IndexerManager {
     /// - Compares [`crate::ocr::signature`] with the one recorded for this
     ///   index. On a change (an engine became usable, the user switched, an
     ///   OCR fix shipped) every image and PDF is re-queued and the extraction
-    ///   cache dropped. Returns true when it re-queued.
+    ///   cache dropped.
+    ///
     /// Returns how many images/PDFs were queued for a re-read. Zero is a
     /// meaningful answer: the signature changed but nothing was left to
     /// re-read, and a crawl reason must not blame OCR for work it did not
@@ -1854,10 +1855,10 @@ impl IndexerManager {
                 }
             }
             if crate::ocr::engine_name() == crate::ocr::ACCURATE && !crate::ocr::pack_present() {
-                crate::models::download_ocr_pack();
+                let _ = crate::models::download_ocr_pack();
             }
             if crate::ocr::engine_name() == crate::ocr::INDRA && !crate::ocr_indra::pack_present() {
-                crate::models::download_indra_pack();
+                let _ = crate::models::download_indra_pack();
             }
         }
 

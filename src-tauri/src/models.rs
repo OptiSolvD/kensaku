@@ -8,7 +8,6 @@ use crate::config::KensakuConfig;
 use serde::Serialize;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 
@@ -266,47 +265,99 @@ pub struct ModelsStatus {
     pub total_present_bytes: u64,
 }
 
-/// Process-global guard so only one download thread can run at a time.
-static DOWNLOADING: AtomicBool = AtomicBool::new(false);
-static PROGRESS: OnceLock<Mutex<Option<ModelProgress>>> = OnceLock::new();
-static LAST_ERROR: OnceLock<Mutex<Option<String>>> = OnceLock::new();
-
-fn progress_slot() -> &'static Mutex<Option<ModelProgress>> {
-    PROGRESS.get_or_init(|| Mutex::new(None))
+/// Which pack a download belongs to. Progress and errors are reported only by
+/// the status of the pack actually being fetched; otherwise every pack's card
+/// claimed to be downloading whenever any one of them was.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Pack {
+    Models,
+    Ocr,
+    Indra,
+    Smart,
+    Visual,
 }
 
-fn error_slot() -> &'static Mutex<Option<String>> {
-    LAST_ERROR.get_or_init(|| Mutex::new(None))
-}
-
-fn set_progress(progress: Option<ModelProgress>) {
-    let mut guard = match progress_slot().lock() {
-        Ok(guard) => guard,
-        Err(poisoned) => poisoned.into_inner(),
-    };
-    *guard = progress;
-}
-
-fn set_error(error: Option<String>) {
-    let mut guard = match error_slot().lock() {
-        Ok(guard) => guard,
-        Err(poisoned) => poisoned.into_inner(),
-    };
-    *guard = error;
-}
-
-fn current_progress() -> Option<ModelProgress> {
-    match progress_slot().lock() {
-        Ok(guard) => guard.clone(),
-        Err(poisoned) => poisoned.into_inner().clone(),
+impl Pack {
+    fn of(artifacts: &[Artifact]) -> Option<Self> {
+        let is = |list: &[Artifact]| {
+            artifacts.len() == list.len() && std::ptr::eq(artifacts.as_ptr(), list.as_ptr())
+        };
+        if is(&ARTIFACTS) {
+            Some(Self::Models)
+        } else if is(&OCR_ARTIFACTS) {
+            Some(Self::Ocr)
+        } else if is(&INDRA_ARTIFACTS) {
+            Some(Self::Indra)
+        } else if is(&SMART_ARTIFACTS) {
+            Some(Self::Smart)
+        } else if is(&VISUAL_ARTIFACTS) {
+            Some(Self::Visual)
+        } else {
+            None
+        }
     }
 }
 
-fn current_error() -> Option<String> {
-    match error_slot().lock() {
-        Ok(guard) => guard.clone(),
-        Err(poisoned) => poisoned.into_inner().clone(),
+const BUSY_DOWNLOAD: &str =
+    "Another model download is already running. Try again when it finishes.";
+
+/// The single in-flight download, plus the last error, each tagged with the
+/// pack it belongs to so one pack's state never leaks into another's status.
+#[derive(Default)]
+struct DownloadState {
+    running: Option<Pack>,
+    progress: Option<(Pack, ModelProgress)>,
+    error: Option<(Pack, String)>,
+}
+
+impl DownloadState {
+    /// What a status for `pack` should report.
+    fn view(&self, pack: Option<Pack>) -> (bool, Option<ModelProgress>, Option<String>) {
+        let downloading = pack.is_some() && self.running == pack;
+        let progress = if downloading {
+            self.progress
+                .as_ref()
+                .filter(|(owner, _)| Some(*owner) == pack)
+                .map(|(_, progress)| progress.clone())
+        } else {
+            None
+        };
+        let error = self
+            .error
+            .as_ref()
+            .filter(|(owner, _)| Some(*owner) == pack)
+            .map(|(_, error)| error.clone());
+        (downloading, progress, error)
     }
+}
+
+static STATE: OnceLock<Mutex<DownloadState>> = OnceLock::new();
+
+fn state() -> &'static Mutex<DownloadState> {
+    STATE.get_or_init(|| Mutex::new(DownloadState::default()))
+}
+
+fn with_state<R>(f: impl FnOnce(&mut DownloadState) -> R) -> R {
+    match state().lock() {
+        Ok(mut guard) => f(&mut guard),
+        Err(poisoned) => f(&mut poisoned.into_inner()),
+    }
+}
+
+fn set_progress(pack: Pack, progress: Option<ModelProgress>) {
+    with_state(|state| state.progress = progress.map(|progress| (pack, progress)));
+}
+
+fn set_error(pack: Pack, error: Option<String>) {
+    with_state(|state| state.error = error.map(|error| (pack, error)));
+}
+
+fn set_running(pack: Option<Pack>) {
+    with_state(|state| state.running = pack);
+}
+
+fn download_running() -> bool {
+    with_state(|state| state.running.is_some())
 }
 
 pub fn models_dir() -> PathBuf {
@@ -399,13 +450,14 @@ fn status_for(dir: &Path, artifacts_list: &[Artifact]) -> ModelsStatus {
     }
 
     let ready = artifacts.iter().all(|artifact| artifact.present);
+    let (downloading, progress, error) = with_state(|state| state.view(Pack::of(artifacts_list)));
 
     ModelsStatus {
         dir: dir.to_string_lossy().to_string(),
         ready,
-        downloading: DOWNLOADING.load(Ordering::Relaxed),
-        progress: current_progress(),
-        error: current_error(),
+        downloading,
+        progress,
+        error,
         artifacts,
         total_bytes,
         total_present_bytes,
@@ -414,10 +466,10 @@ fn status_for(dir: &Path, artifacts_list: &[Artifact]) -> ModelsStatus {
 
 /// Starts a background download of every missing artifact.
 ///
-/// Returns immediately. Calling this while a download is already running is a
-/// no-op.
-pub fn download_all() {
-    start_download(models_dir(), &ARTIFACTS, "kensaku-model-download", "model");
+/// Returns immediately. Returns [`BUSY_DOWNLOAD`] if another pack is already
+/// downloading, so callers can tell the user instead of failing silently.
+pub fn download_all() -> Result<(), String> {
+    start_download(models_dir(), &ARTIFACTS, "kensaku-model-download", "model")
 }
 
 /// Called once an OCR pack (PP-OCR or Indra) has finished downloading and
@@ -441,43 +493,43 @@ pub fn on_ocr_pack_ready(callback: impl Fn() + Send + Sync + 'static) {
 }
 
 /// Starts a background download of the optional accurate OCR pack.
-pub fn download_ocr_pack() {
+pub fn download_ocr_pack() -> Result<(), String> {
     start_download(
         crate::ocr::pack_dir(),
         &OCR_ARTIFACTS,
         "kensaku-ocr-download",
         "OCR pack",
-    );
+    )
 }
 
 /// Starts a background download of the optional Indra OCR pack.
-pub fn download_indra_pack() {
+pub fn download_indra_pack() -> Result<(), String> {
     start_download(
         crate::ocr_indra::pack_dir(),
         &INDRA_ARTIFACTS,
         "kensaku-indra-download",
         "Indra OCR pack",
-    );
+    )
 }
 
 /// Starts a background download of the optional ONNX smart embedding pack.
-pub fn download_smart_pack() {
+pub fn download_smart_pack() -> Result<(), String> {
     start_download(
         smart_dir(),
         &SMART_ARTIFACTS,
         "kensaku-smart-download",
         "smart embedding pack",
-    );
+    )
 }
 
 /// Starts a background download of the optional ONNX visual embedding pack.
-pub fn download_visual_pack() {
+pub fn download_visual_pack() -> Result<(), String> {
     start_download(
         visual_dir(),
         &VISUAL_ARTIFACTS,
         "kensaku-visual-download",
         "visual embedding pack",
-    );
+    )
 }
 
 fn start_download(
@@ -485,53 +537,64 @@ fn start_download(
     artifacts: &'static [Artifact],
     thread_name: &str,
     label: &'static str,
-) {
-    if DOWNLOADING.swap(true, Ordering::SeqCst) {
-        return;
+) -> Result<(), String> {
+    let Some(pack) = Pack::of(artifacts) else {
+        return Err("Unknown model pack; refusing to start a download.".to_string());
+    };
+
+    let already_running = with_state(|state| {
+        if state.running.is_some() {
+            true
+        } else {
+            state.running = Some(pack);
+            false
+        }
+    });
+    if already_running {
+        return Err(BUSY_DOWNLOAD.to_string());
     }
 
-    if let Err(e) = ensure_dir(&dir) {
-        set_error(Some(e));
-        DOWNLOADING.store(false, Ordering::SeqCst);
-        return;
+    if let Err(error) = ensure_dir(&dir) {
+        set_error(pack, Some(error.clone()));
+        set_running(None);
+        return Err(error);
     }
 
-    set_error(None);
-    set_progress(None);
+    set_error(pack, None);
+    set_progress(pack, None);
 
     let spawned = std::thread::Builder::new()
         .name(thread_name.to_string())
-        .spawn(move || run_download(dir, artifacts, label));
+        .spawn(move || run_download(dir, artifacts, pack, label));
 
     if let Err(e) = spawned {
-        set_error(Some(format!(
-            "Failed to start {} download thread: {}",
-            label, e
-        )));
-        DOWNLOADING.store(false, Ordering::SeqCst);
+        let error = format!("Failed to start {} download thread: {}", label, e);
+        set_error(pack, Some(error.clone()));
+        set_running(None);
+        return Err(error);
     }
+    Ok(())
 }
 
-fn run_download(dir: PathBuf, artifacts: &'static [Artifact], label: &'static str) {
-    match download_missing_for(&dir, artifacts, label) {
+fn run_download(dir: PathBuf, artifacts: &'static [Artifact], pack: Pack, label: &'static str) {
+    match download_missing_for(&dir, artifacts, pack, label) {
         Ok(()) => {
-            set_progress(None);
-            set_error(None);
-            if (std::ptr::eq(artifacts, &OCR_ARTIFACTS[..])
-                || std::ptr::eq(artifacts, &INDRA_ARTIFACTS[..]))
+            set_progress(pack, None);
+            set_error(pack, None);
+            if matches!(pack, Pack::Ocr | Pack::Indra)
                 && let Some(callback) = OCR_PACK_READY.get()
             {
                 // Clear the flag first so a callback that checks status sees
                 // the download as finished.
-                DOWNLOADING.store(false, Ordering::SeqCst);
+                set_running(None);
                 callback();
             }
-            if std::ptr::eq(artifacts, &ARTIFACTS[..]) {
+            if pack == Pack::Models {
                 // Without this the files sat on disk while search kept ranking
                 // on the hashing fallback, because the registry was built once
                 // at startup and never rebuilt.
                 let changed = crate::embed::ModelRegistry::reload();
-                DOWNLOADING.store(false, Ordering::SeqCst);
+                set_running(None);
                 if let Some(callback) = SEMANTIC_MODELS_READY.get() {
                     callback();
                 }
@@ -543,14 +606,19 @@ fn run_download(dir: PathBuf, artifacts: &'static [Artifact], label: &'static st
             }
         }
         Err(e) => {
-            set_progress(None);
-            set_error(Some(e));
+            set_progress(pack, None);
+            set_error(pack, Some(e));
         }
     }
-    DOWNLOADING.store(false, Ordering::SeqCst);
+    set_running(None);
 }
 
-fn download_missing_for(dir: &Path, artifacts: &[Artifact], label: &str) -> Result<(), String> {
+fn download_missing_for(
+    dir: &Path,
+    artifacts: &[Artifact],
+    pack: Pack,
+    label: &str,
+) -> Result<(), String> {
     ensure_dir(dir)?;
 
     let missing_bytes: u64 = artifacts
@@ -575,7 +643,7 @@ fn download_missing_for(dir: &Path, artifacts: &[Artifact], label: &str) -> Resu
     // Always verify an existing artifact. A truncated or corrupt final file is
     // removed and downloaded again instead of being trusted by name alone.
     for artifact in artifacts {
-        download_one(dir, artifact, total_bytes, completed_bytes)?;
+        download_one(dir, artifact, pack, total_bytes, completed_bytes)?;
         completed_bytes = completed_bytes.saturating_add(artifact.bytes_expected);
     }
 
@@ -603,6 +671,7 @@ fn free_bytes(_path: &Path) -> Option<u64> {
 fn download_one(
     dir: &Path,
     artifact: &Artifact,
+    pack: Pack,
     total_bytes: u64,
     completed_before: u64,
 ) -> Result<(), String> {
@@ -610,19 +679,25 @@ fn download_one(
     if final_path.is_file() {
         // Show "verifying" instead of a misleading 0% while the existing
         // file's checksum is being read.
-        set_progress(Some(ModelProgress {
-            file: artifact.name.to_string(),
-            downloaded: completed_before,
-            total: total_bytes,
-            phase: "verifying".to_string(),
-        }));
-        if sha256_matches(&final_path, artifact.sha256)? {
-            set_progress(Some(ModelProgress {
+        set_progress(
+            pack,
+            Some(ModelProgress {
                 file: artifact.name.to_string(),
-                downloaded: completed_before.saturating_add(artifact.bytes_expected),
+                downloaded: completed_before,
                 total: total_bytes,
-                phase: "downloading".to_string(),
-            }));
+                phase: "verifying".to_string(),
+            }),
+        );
+        if sha256_matches(&final_path, artifact.sha256)? {
+            set_progress(
+                pack,
+                Some(ModelProgress {
+                    file: artifact.name.to_string(),
+                    downloaded: completed_before.saturating_add(artifact.bytes_expected),
+                    total: total_bytes,
+                    phase: "downloading".to_string(),
+                }),
+            );
             return Ok(());
         }
         let _ = std::fs::remove_file(&final_path);
@@ -635,18 +710,22 @@ fn download_one(
         downloaded = 0;
     }
 
-    set_progress(Some(ModelProgress {
-        file: artifact.name.to_string(),
-        downloaded: completed_before.saturating_add(downloaded),
-        total: total_bytes,
-        phase: "downloading".to_string(),
-    }));
+    set_progress(
+        pack,
+        Some(ModelProgress {
+            file: artifact.name.to_string(),
+            downloaded: completed_before.saturating_add(downloaded),
+            total: total_bytes,
+            phase: "downloading".to_string(),
+        }),
+    );
 
     let mut last_error = None;
     for url in artifact.urls {
         match download_url(
             url,
             artifact,
+            pack,
             &part_path,
             &mut downloaded,
             completed_before,
@@ -657,12 +736,15 @@ fn download_one(
                     std::fs::rename(&part_path, &final_path).map_err(|e| {
                         format!("Failed to finalize {}: {}", final_path.display(), e)
                     })?;
-                    set_progress(Some(ModelProgress {
-                        file: artifact.name.to_string(),
-                        downloaded: completed_before.saturating_add(artifact.bytes_expected),
-                        total: total_bytes,
-                        phase: "downloading".to_string(),
-                    }));
+                    set_progress(
+                        pack,
+                        Some(ModelProgress {
+                            file: artifact.name.to_string(),
+                            downloaded: completed_before.saturating_add(artifact.bytes_expected),
+                            total: total_bytes,
+                            phase: "downloading".to_string(),
+                        }),
+                    );
                     return Ok(());
                 }
                 let _ = std::fs::remove_file(&part_path);
@@ -681,6 +763,7 @@ fn download_one(
 fn download_url(
     url: &str,
     artifact: &Artifact,
+    pack: Pack,
     part_path: &Path,
     downloaded: &mut u64,
     completed_before: u64,
@@ -749,12 +832,15 @@ fn download_url(
         file.write_all(&buffer[..read])
             .map_err(|e| format!("Failed to write {}: {}", part_path.display(), e))?;
         *downloaded = downloaded.saturating_add(read as u64);
-        set_progress(Some(ModelProgress {
-            file: artifact.name.to_string(),
-            downloaded: completed_before.saturating_add(*downloaded),
-            total: total_bytes,
-            phase: "downloading".to_string(),
-        }));
+        set_progress(
+            pack,
+            Some(ModelProgress {
+                file: artifact.name.to_string(),
+                downloaded: completed_before.saturating_add(*downloaded),
+                total: total_bytes,
+                phase: "downloading".to_string(),
+            }),
+        );
     }
     if total > 0 && *downloaded < total {
         return Err(format!(
@@ -794,7 +880,7 @@ fn sha256_file(path: &Path) -> Result<String, String> {
 
 /// Removes every model artifact and resets progress/error state.
 pub fn delete_all() -> Result<(), String> {
-    if DOWNLOADING.load(Ordering::SeqCst) {
+    if download_running() {
         return Err("A model download is in progress. Try again once it finishes.".to_string());
     }
 
@@ -805,8 +891,10 @@ pub fn delete_all() -> Result<(), String> {
     }
     ensure_dir(&dir)?;
 
-    set_progress(None);
-    set_error(None);
+    with_state(|state| {
+        state.progress = None;
+        state.error = None;
+    });
     Ok(())
 }
 
@@ -817,7 +905,7 @@ pub async fn get_models_status() -> Result<ModelsStatus, String> {
 
 #[tauri::command]
 pub async fn download_models() -> Result<(), String> {
-    download_all();
+    download_all()?;
     Ok(())
 }
 
@@ -829,6 +917,41 @@ pub async fn delete_models() -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn download_state_never_leaks_between_packs() {
+        let state = DownloadState {
+            running: Some(Pack::Ocr),
+            progress: Some((
+                Pack::Ocr,
+                ModelProgress {
+                    file: "ppocr.onnx".to_string(),
+                    downloaded: 5,
+                    total: 10,
+                    phase: "downloading".to_string(),
+                },
+            )),
+            error: Some((Pack::Models, "model download failed".to_string())),
+        };
+
+        // The pack being fetched reports the download and its progress.
+        let (downloading, progress, error) = state.view(Some(Pack::Ocr));
+        assert!(downloading);
+        assert_eq!(progress.map(|p| p.file), Some("ppocr.onnx".to_string()));
+        assert_eq!(error, None, "another pack's error must not leak in");
+
+        // A different pack is idle, even while PP-OCR downloads.
+        let (downloading, progress, error) = state.view(Some(Pack::Indra));
+        assert!(!downloading);
+        assert!(progress.is_none());
+        assert_eq!(error, None);
+
+        // The semantic model's error belongs to the semantic card.
+        let (downloading, progress, error) = state.view(Some(Pack::Models));
+        assert!(!downloading);
+        assert!(progress.is_none());
+        assert_eq!(error.as_deref(), Some("model download failed"));
+    }
 
     #[test]
     fn smart_artifacts_manifest_sanity() {
@@ -933,7 +1056,7 @@ mod download_tests {
             bytes_expected: full.len() as u64,
             sha256: None,
         };
-        download_one(&dir, &artifact, artifact.bytes_expected, 0).unwrap();
+        download_one(&dir, &artifact, Pack::Models, artifact.bytes_expected, 0).unwrap();
         assert_eq!(std::fs::read(dir.join("artifact.bin")).unwrap(), full);
         assert!(!part.exists());
         let _ = std::fs::remove_dir_all(&dir);
@@ -971,7 +1094,7 @@ mod download_tests {
             bytes_expected: full.len() as u64,
             sha256: None,
         };
-        download_one(&dir, &artifact, artifact.bytes_expected, 0).unwrap();
+        download_one(&dir, &artifact, Pack::Models, artifact.bytes_expected, 0).unwrap();
         assert_eq!(std::fs::read(dir.join("artifact.bin")).unwrap(), full);
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -1000,7 +1123,7 @@ mod download_tests {
             bytes_expected: full.len() as u64,
             sha256: None,
         };
-        let result = download_one(&dir, &artifact, artifact.bytes_expected, 0);
+        let result = download_one(&dir, &artifact, Pack::Models, artifact.bytes_expected, 0);
         assert!(result.is_err());
         assert!(dir.join("artifact.bin.part").exists());
         let _ = std::fs::remove_dir_all(&dir);
