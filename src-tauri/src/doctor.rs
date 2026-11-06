@@ -679,7 +679,7 @@ fn check_models() -> DoctorCheck {
         // anyway while the semantic row reported a fallback. Verify the load.
         let dir = models::models_dir();
         let config = crate::config::KensakuConfig::load();
-        return match crate::embed::table::StaticTable::load_with_f32_reason(
+        return match crate::embed::ModelRegistry::load_with_f32_reason_from_dir(
             &dir,
             config.semantic_f32_table,
         ) {

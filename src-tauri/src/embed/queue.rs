@@ -15,7 +15,7 @@ use std::time::Duration;
 type CachedChunks = Arc<Vec<(usize, usize, Vec<i8>)>>;
 
 pub struct EmbeddingQueue {
-    pub model: ModelRegistry,
+    pub model: std::sync::Arc<ModelRegistry>,
     pub unit_store: Arc<RwLock<UnitStore>>,
     pub is_running: Arc<AtomicBool>,
     pub query_in_flight: Arc<AtomicBool>,
@@ -26,7 +26,7 @@ pub struct EmbeddingQueue {
 
 impl EmbeddingQueue {
     pub fn new(
-        model: ModelRegistry,
+        model: std::sync::Arc<ModelRegistry>,
         unit_store: Arc<RwLock<UnitStore>>,
         status: Option<Arc<RwLock<IndexingStatus>>>,
         app_handle: Option<Arc<RwLock<Option<tauri::AppHandle>>>>,
@@ -224,7 +224,7 @@ impl EmbeddingQueue {
                                     node_id,
                                     byte_start: *start,
                                     byte_end: *end,
-                                    model_id: ModelRegistry::global().model_id,
+                                    model_id: model_ref.model_id,
                                 },
                                 vec.clone(),
                                 content_hash.clone(),
@@ -249,7 +249,7 @@ impl EmbeddingQueue {
                             node_id,
                             unit.byte_start,
                             unit.byte_end,
-                            ModelRegistry::global().model_id,
+                            model_ref.model_id,
                             &vec,
                         ) {
                             unit.id = inserted_id;

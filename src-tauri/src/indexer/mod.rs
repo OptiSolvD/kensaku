@@ -1922,7 +1922,7 @@ impl IndexerManager {
     /// nonsense. The registry now reloads on download and calls this.
     pub fn on_semantic_model_changed(self: &Arc<Self>) {
         let expected_model_id = crate::embed::ModelRegistry::global().model_id;
-        if let Some(db) = self.metadata_store.read().db() {
+        if let Some(db) = self.metadata.read().db() {
             match db.units_model_id() {
                 Ok(Some(existing)) if existing != expected_model_id => {
                     match db.reset_semantic_index() {

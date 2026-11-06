@@ -104,6 +104,21 @@ impl ModelRegistry {
         Self::load_with_f32(dir, false)
     }
 
+    /// Same as [`Self::load_with_f32`], but returns why it failed.
+    pub fn load_with_f32_reason_from_dir(dir: &Path, use_f32: bool) -> Result<Self, String> {
+        let table = StaticTable::load_with_f32_reason(dir, use_f32)?;
+        Ok(Self {
+            provider: EmbeddingProviderKind::Static,
+            model_id: table.model_id,
+            name: "potion-base-8M".to_string(),
+            dim: table.dim,
+            normalize: table.normalize,
+            fallback_reason: None,
+            table: Some(Arc::new(table)),
+            smart: None,
+        })
+    }
+
     /// Loads the static table, optionally keeping the f32 matrix.
     pub fn load_with_f32(dir: &Path, use_f32: bool) -> Option<Self> {
         let table = StaticTable::load_with_f32(dir, use_f32)?;
@@ -131,7 +146,7 @@ impl ModelRegistry {
             "static" | "potion" => {
                 // Name the failing step: "not found" was reported for every
                 // failure, including files that are present and unparseable.
-                match Self::load_with_f32_reason(dir, config.semantic_f32_table) {
+                match Self::load_with_f32_reason_from_dir(dir, config.semantic_f32_table) {
                     Ok(registry) => registry,
                     Err(reason) => {
                         let mut reg = Self::new_static();
