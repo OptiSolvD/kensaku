@@ -93,21 +93,24 @@ fn acquire_instance_lock() -> Result<Option<std::fs::File>, String> {
     }
 }
 
-/// Request file a second launch writes to ask the running app to toggle its
-/// window. A file works on every OS and needs no sockets; the running app
-/// polls for it.
-fn toggle_request_path() -> PathBuf {
-    KensakuConfig::config_dir().join("toggle.request")
+/// Request file a second launch writes to ask the running app to show (or
+/// toggle) its window. A file works on every OS and needs no sockets; the
+/// running app polls for it.
+fn window_request_path() -> PathBuf {
+    KensakuConfig::config_dir().join("window.request")
 }
 
-/// `kensaku --toggle`: ask the running app to show or hide its window, then
-/// exit. Used by desktop shortcuts on Linux, where global keys may be blocked.
-fn request_toggle_and_exit() -> ! {
-    let path = toggle_request_path();
+/// Asks the running app for its window, then exits.
+///
+/// A normal launch (Start menu, desktop shortcut) means "show the window".
+/// `--toggle` means show-or-hide, used by desktop shortcuts on Linux where
+/// global keys may be blocked.
+fn request_window_and_exit(command: &str) -> ! {
+    let path = window_request_path();
     if let Some(dir) = path.parent() {
         let _ = std::fs::create_dir_all(dir);
     }
-    let _ = std::fs::write(&path, b"toggle");
+    let _ = std::fs::write(&path, command);
     std::process::exit(0);
 }
 
@@ -116,11 +119,11 @@ fn acquire_instance_lock_or_exit() -> Option<std::fs::File> {
     match acquire_instance_lock() {
         Ok(Some(file)) => Some(file),
         Ok(None) => {
-            if std::env::args().any(|a| a == "--toggle") {
-                request_toggle_and_exit();
-            }
-            eprintln!("[Kensaku] Another Kensaku instance is already running; exiting.");
-            std::process::exit(0);
+            // Closing to the tray keeps the process alive, so a launch from the
+            // Start menu would otherwise hit this guard and exit without
+            // showing anything. Ask the running instance for its window.
+            let toggle = std::env::args().any(|a| a == "--toggle");
+            request_window_and_exit(if toggle { "toggle" } else { "show" });
         }
         Err(e) => {
             eprintln!(
@@ -146,6 +149,40 @@ pub fn reset_pending() -> bool {
     reset_marker_path().exists()
 }
 
+/// How many times a pending reset is retried, and how long between attempts.
+///
+/// A reset is only retried when deleting something failed. On a normal start
+/// there is no marker and none of this runs.
+const RESET_ATTEMPTS: u32 = 20;
+const RESET_RETRY: std::time::Duration = std::time::Duration::from_millis(150);
+
+/// Runs `reset` until it succeeds or the attempt budget runs out.
+///
+/// Split out so the retry contract is testable without having to hold real
+/// files open. Returns the last error when every attempt failed.
+fn reset_with_retries<F>(
+    attempts: u32,
+    delay: std::time::Duration,
+    mut reset: F,
+) -> Result<(), String>
+where
+    F: FnMut() -> Result<(), String>,
+{
+    let mut last = String::new();
+    for attempt in 1..=attempts {
+        match reset() {
+            Ok(()) => return Ok(()),
+            Err(error) => {
+                last = error;
+                if attempt < attempts {
+                    std::thread::sleep(delay);
+                }
+            }
+        }
+    }
+    Err(last)
+}
+
 /// Applies a reset marker in `dir`. Returns true when a marker was found and
 /// the directory was cleared/recreated. Split from the startup path so the
 /// marker/restart contract has an automated test.
@@ -163,7 +200,16 @@ fn apply_pending_reset_in(dir: &std::path::Path) -> bool {
         remove_packs: reset_marker_removes_packs(dir),
     };
 
-    match maintenance::apply_reset(dir, scope) {
+    // The replacement process is spawned before the old one exits, so the
+    // previous process can still hold the index's memory maps when this runs.
+    // Windows refuses to delete a mapped file, which left the marker in place
+    // and made the app reset itself again on the next launch. Retry briefly:
+    // the old process is already exiting and releases everything in moments.
+    let result = reset_with_retries(RESET_ATTEMPTS, RESET_RETRY, || {
+        maintenance::apply_reset(dir, scope)
+    });
+
+    match result {
         Ok(()) => {
             if let Err(e) = std::fs::create_dir_all(dir) {
                 eprintln!(
@@ -350,9 +396,9 @@ pub fn run() {
         if crate::ocr::accurate_compiled() && crate::ocr::runtime_loadable() {
             // One download at a time: the selected engine's pack first.
             if crate::ocr::engine_name() == crate::ocr::INDRA && !crate::ocr_indra::pack_present() {
-                crate::models::download_indra_pack();
+                let _ = crate::models::download_indra_pack();
             } else if !crate::ocr::pack_present() {
-                crate::models::download_ocr_pack();
+                let _ = crate::models::download_ocr_pack();
             }
         }
     }
@@ -490,16 +536,23 @@ pub fn run() {
             models::delete_models,
         ])
         .setup(move |app| {
-            // Watch for `kensaku --toggle` from a second launch: it drops a request
-            // file, and we toggle the window here. Cheap: one stat every 150 ms.
+            // Watch for a second launch (`--toggle`, or a plain Start-menu
+            // click that must reopen the hidden window). It drops a request
+            // file; a plain launch shows, `--toggle` toggles. Cheap: one small
+            // read every 150 ms, and a normal launch has no file to read.
             {
                 let handle = app.handle().clone();
                 std::thread::spawn(move || loop {
                     std::thread::sleep(std::time::Duration::from_millis(150));
-                    let path = toggle_request_path();
-                    if path.exists() {
-                        let _ = std::fs::remove_file(&path);
+                    let path = window_request_path();
+                    let Ok(request) = std::fs::read_to_string(&path) else {
+                        continue;
+                    };
+                    let _ = std::fs::remove_file(&path);
+                    if request.trim() == "toggle" {
                         main_window::toggle(&handle);
+                    } else {
+                        main_window::show(&handle);
                     }
                 });
             }
@@ -625,6 +678,34 @@ mod reset_tests {
         // A second call without a marker is a no-op.
         assert!(!apply_pending_reset_in(&dir));
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn reset_retries_while_the_old_process_still_holds_the_index() {
+        let mut calls = 0;
+        let result = reset_with_retries(5, std::time::Duration::ZERO, || {
+            calls += 1;
+            if calls < 3 {
+                Err("index is mapped by another process".to_string())
+            } else {
+                Ok(())
+            }
+        });
+
+        assert!(result.is_ok());
+        assert_eq!(calls, 3, "it must stop retrying once the reset works");
+    }
+
+    #[test]
+    fn reset_reports_the_last_error_when_every_attempt_fails() {
+        let mut calls = 0;
+        let result = reset_with_retries(3, std::time::Duration::ZERO, || {
+            calls += 1;
+            Err(format!("busy {calls}"))
+        });
+
+        assert_eq!(result, Err("busy 3".to_string()));
+        assert_eq!(calls, 3);
     }
 
     #[test]
