@@ -502,9 +502,10 @@ fn parse_safetensors<R: Read + Seek>(reader: &mut R) -> Option<(Vec<f32>, usize,
     }
     let vocab_size = shape[0];
     let dim = shape[1];
-    if dim != EMBEDDING_DIM {
-        return None;
-    }
+    // Keep a wrong width in the result so the loader can say which width it
+    // found and which one this build expects. Returning `None` here collapsed
+    // that into "not a readable safetensors matrix" and sent whoever debugged
+    // it looking at the wrong problem.
     let item_size: u64 = match dtype.as_str() {
         "F32" => 4,
         "F16" => 2,
@@ -703,10 +704,19 @@ mod tests {
 
     #[test]
     fn rejects_wrong_embedding_width() {
+        let dir = temp_dir("wrong-width");
+        std::fs::create_dir_all(&dir).unwrap();
         let data = vec![0u8; 3 * 4];
-        let bytes = safetensors_bytes("F32", &[1, 3], &data);
-        let mut reader = Cursor::new(bytes);
-        assert!(parse_safetensors(&mut reader).is_none());
+        std::fs::write(
+            dir.join("model.safetensors"),
+            safetensors_bytes("F32", &[1, 3], &data),
+        )
+        .unwrap();
+        assert!(
+            StaticTable::load(&dir).is_none(),
+            "a matrix of the wrong width must still be rejected by the loader"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
