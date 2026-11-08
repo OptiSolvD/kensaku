@@ -6,13 +6,13 @@ versioning: [SemVer](https://semver.org/).
 ## [Unreleased]
 
 ### Added
-- **Dark-mode tray icon on Windows** (#46). The Windows system tray icon now
-  switches to a light, high-contrast variant when the app theme is set to
-  `dark`, so the icon remains legible on a dark-coloured taskbar. The icon
-  follows the **app theme** (toggled in Settings) rather than the system
-  taskbar setting, matching the owner's intent. The two icon assets
-  (`tray-dark.png` / `tray-light.png`) are embedded at compile time; no extra
-  files are shipped at runtime.
+- **Dark-mode tray icon on Windows** (#46). The Windows tray icon now has a
+  light, high-contrast variant that is used when the app theme is set to
+  `dark`, so the icon stays legible on a dark taskbar. It follows the **app
+  theme** (Settings → Appearance), not the Windows taskbar setting, and swaps
+  immediately when the theme changes. Both assets (`tray-dark.png` /
+  `tray-light.png`) are embedded at compile time; no extra files ship at
+  runtime. macOS and Linux are unchanged.
 
 ## [1.0.16] — 2026-11-05
 

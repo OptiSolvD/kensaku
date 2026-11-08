@@ -1,39 +1,38 @@
 // Copyright (c) Kensaku contributors. SPDX-License-Identifier: MIT
 //! Tray-icon helpers: picks the right icon bytes for the current app theme.
 //!
-//! On Windows the system tray sits on a taskbar whose appearance follows the
-//! "Taskbar behaviours" accent setting.  When the user picks a **light**
-//! taskbar the standard dark-background icon disappears. We therefore ship a
-//! light variant (`tray-light.png`) that is substituted when the app theme is
-//! `"dark"`. Other platforms keep today's behaviour and always use
-//! the standard icon.
+//! On Windows the tray sits on a taskbar whose colour follows the system
+//! "Taskbar behaviours" setting. The standard teal glyph vanishes on a **dark**
+//! taskbar, so we also ship a high-contrast light variant (`tray-light.png`).
+//! The variant follows the **app** theme, per #46: `"dark"` uses the light
+//! glyph, `"light"` keeps the standard icon. Other platforms keep today's
+//! behaviour and always use the standard icon.
 //!
 //! # Design constraints
-//! * No I/O at runtime: both PNGs are embedded with `include_bytes!` and
-//!   decoded lazily on the first call.
+//! * No I/O at runtime: both PNGs are embedded with `include_bytes!`.
 //! * Fallback-safe: a decode failure returns `None`; callers fall back to
 //!   `app.default_window_icon()`.
-//! * Platform-agnostic: `tray_icon_for_theme` compiles everywhere and always
-//!   returns `None` on non-Windows targets so the calling code can be a simple
-//!   `if let Some(icon) = tray_icon_for_theme(...)`.
+//! * Testable without Tauri: [`tray_icon_bytes`] is a pure function, so icon
+//!   selection is unit-tested; only [`decode_png`] touches image data.
 
-/// Raw PNG bytes for the standard (dark-background) tray icon.
+/// Raw PNG bytes for the standard tray icon: teal glyph on transparency.
 ///
 /// This is the same 32×32 source used by the rest of the app.
 static TRAY_DARK_PNG: &[u8] = include_bytes!("../icons/tray-dark.png");
 
-/// Raw PNG bytes for the light-taskbar tray icon.
+/// Raw PNG bytes for the high-contrast tray icon.
 ///
-/// A light monochrome variant of the standard icon so it remains legible on
+/// A white monochrome variant of the standard glyph so it remains legible on
 /// dark Windows taskbars.
 static TRAY_LIGHT_PNG: &[u8] = include_bytes!("../icons/tray-light.png");
 
 /// Returns the PNG byte slice that matches `theme`.
 ///
-/// | `theme` value           | returned bytes      |
-/// |-------------------------|---------------------|
-/// | `"light"` / `"paper"`  | `TRAY_LIGHT_PNG`    |
-/// | anything else           | `TRAY_DARK_PNG`     |
+/// | `theme` value                   | returned bytes   |
+/// |---------------------------------|------------------|
+/// | `"dark"` / `"void"`             | `TRAY_LIGHT_PNG` |
+/// | `"light"` / `"paper"`           | `TRAY_DARK_PNG`  |
+/// | anything else                   | `TRAY_LIGHT_PNG` |
 ///
 /// The function is `pub` and free of side-effects so it can be unit-tested
 /// without a running Tauri application.
